@@ -1,70 +1,111 @@
-# Getting Started with Create React App
+# Quality Management System (QMS)
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+A comprehensive quality management system built with React and Firebase.
 
-## Available Scripts
+## System Overview
 
-In the project directory, you can run:
+This QMS system provides role-based access control for different departments and functions within an organization. Users can only access the system through accounts created by administrators.
 
-### `npm start`
+## User Management
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+### Admin-Only User Creation
+- **Only administrators can create new user accounts**
+- Users cannot self-register
+- All user accounts are managed through the Admin Dashboard
+- Each user is assigned a specific role with corresponding permissions
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+### Available Roles
+- **Admin**: Full system access, user management
+- **Purchase Team**: Purchase order management
+- **Manager**: Operations oversight
+- **Vendor**: Supplier portal access
+- **Gate Security**: Entry/exit management
+- **Sample Dept**: Sample collection and testing
+- **QC Dept**: Quality control operations
+- **Weighbridge Operator**: Weight measurement operations
+- **Unloading Dept**: Material unloading management
+- **Accounts Dept**: Financial operations
 
-### `npm test`
+## Getting Started
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+### First Time Setup
+1. **Create Admin Account**: Use the `/setup` route to create the first admin user
+2. **Login as Admin**: Access the admin dashboard at `/admin`
+3. **Create Users**: Use the Users Management section to create accounts for team members
+4. **Assign Roles**: Each user should be assigned the appropriate role for their department
 
-### `npm run build`
+### User Login
+- Users can only login with credentials provided by administrators
+- No sample or demo accounts exist
+- All accounts are created through the admin interface
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+## Features
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+### Admin Dashboard
+- User management (create, edit, delete, activate/deactivate)
+- Role assignment and management
+- System monitoring and settings
+- Purchase order oversight
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+### Department Dashboards
+Each role has access to specific functionality:
+- **Purchase Team**: Create and manage purchase orders
+- **Manager**: View reports and manage operations
+- **Vendor**: Submit and track orders
+- **Security**: Manage entry/exit logs
+- **Sample/QC**: Record test results and quality data
+- **Weighbridge**: Record weight measurements
+- **Unloading**: Track material unloading
+- **Accounts**: Financial reporting and management
 
-### `npm run eject`
+## Security
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+- Firebase Authentication for secure login
+- Role-based access control
+- Protected routes for each dashboard
+- Admin-only user management
+- No public registration
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+## Technology Stack
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
+- **Frontend**: React with Material-UI
+- **Backend**: Firebase (Authentication, Firestore)
+- **State Management**: React Context API
+- **Routing**: React Router
 
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
+## Development
 
-## Learn More
+### Prerequisites
+- Node.js (v14 or higher)
+- npm or yarn
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+### Installation
+```bash
+cd Quality-system
+npm install
+```
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+### Running the Application
+```bash
+npm start
+```
 
-### Code Splitting
+### Building for Production
+```bash
+npm run build
+```
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
+## File Structure
 
-### Analyzing the Bundle Size
+```
+src/
+├── components/          # React components for each dashboard
+├── contexts/           # React context providers
+├── utils/              # Utility functions
+├── firebase.js         # Firebase configuration
+└── App.js             # Main application component
+```
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
+## Support
 
-### Making a Progressive Web App
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
-
-### Advanced Configuration
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
-
-### Deployment
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
-
-### `npm run build` fails to minify
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+For system administration and user management, contact your system administrator. All user accounts and access permissions are managed through the Admin Dashboard.
