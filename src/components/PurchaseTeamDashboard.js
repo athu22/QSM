@@ -29,12 +29,13 @@ import {
   ShoppingCart,
   Add,
   Visibility,
-  Logout
+  Logout,
+  Print
 } from '@mui/icons-material';
 import { collection, getDocs, addDoc, query, where, orderBy } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useNavigate } from 'react-router-dom';
-import { generatePONumber, validatePONumber } from '../utils/poUtils';
+import { generatePONumber, validatePONumber, printPurchaseOrder } from '../utils/poUtils';
 
 const PurchaseTeamDashboard = () => {
   const { logout, currentUser } = useAuth();
@@ -331,6 +332,14 @@ const PurchaseTeamDashboard = () => {
                         onClick={() => {/* View PO details */}}
                       >
                         View
+                      </Button>
+                      <Button
+                        size="small"
+                        startIcon={<Print />}
+                        onClick={() => printPurchaseOrder(po)}
+                        sx={{ ml: 1 }}
+                      >
+                        Print
                       </Button>
                     </TableCell>
                   </TableRow>
