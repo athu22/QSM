@@ -183,7 +183,7 @@ export const printPurchaseOrder = (po) => {
       <meta name="viewport" content="width=device-width, initial-scale=1"/>
       <title>Purchase Order ${po.poNumber || ''}</title>
       <style>
-        * { box-sizing: border-box; }
+        * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
         body { font-family: Arial, Helvetica, sans-serif; margin: 0; padding: 24px; }
         .sheet { border: 4px solid #e31c1c; padding: 16px; }
         .header { text-align: center; margin-bottom: 12px; }
@@ -200,7 +200,13 @@ export const printPurchaseOrder = (po) => {
         .totals .label { text-align: right; padding-right: 8px; }
         .totals .amount { text-align: right; min-width: 100px; }
         .footer-note { text-align: center; margin-top: 24px; font-size: 12px; }
-        @media print { body { padding: 0; } .sheet { border-width: 3px; } }
+        @media print {
+          body { padding: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+          .sheet { border-width: 3px; border-color: #e31c1c; }
+          .section-title { background: #e31c1c !important; color: #fff !important; }
+          th, td { border-color: #e31c1c !important; }
+          .title { color: #e31c1c !important; }
+        }
       </style>
     </head>
     <body>
