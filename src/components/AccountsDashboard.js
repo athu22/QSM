@@ -350,13 +350,22 @@ const AccountsDashboard = () => {
       <Paper sx={{ p: 3, mt: 3 }}>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
           <Typography variant="h6">Goods Note Receipt (GNR)</Typography>
-          <Button
-            variant="contained"
-            startIcon={<Receipt />}
-            onClick={openCreateGNRDialog}
-          >
-            Create GNR
-          </Button>
+          <Box sx={{ display: 'flex', gap: 1 }}>
+            <Button
+              variant="outlined"
+              startIcon={<Visibility />}
+              onClick={() => navigate('/gnr')}
+            >
+              View GNR
+            </Button>
+            <Button
+              variant="contained"
+              startIcon={<Receipt />}
+              onClick={openCreateGNRDialog}
+            >
+              Create GNR
+            </Button>
+          </Box>
         </Box>
         
         <TableContainer>
