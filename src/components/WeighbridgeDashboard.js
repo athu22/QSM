@@ -21,7 +21,8 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
-  TextField
+  TextField,
+  MenuItem
 } from '@mui/material';
 import {
   Scale,
@@ -35,9 +36,11 @@ import { useNavigate } from 'react-router-dom';
 
 const WeighbridgeDashboard = () => {
   const { logout, currentUser } = useAuth();
+  const { getGateEntriesByPO } = usePO();
   const navigate = useNavigate();
   const [weighbridgeRecords, setWeighbridgeRecords] = useState([]);
   const [openWeightDialog, setOpenWeightDialog] = useState(false);
+  const [availableVehicles, setAvailableVehicles] = useState([]);
   const [weightForm, setWeightForm] = useState({
     vehicleNumber: '',
     poNumber: '',
@@ -108,6 +111,7 @@ const WeighbridgeDashboard = () => {
         weighingDate: '',
         remarks: ''
       });
+      setAvailableVehicles([]);
       fetchWeighbridgeRecords();
     } catch (error) {
       console.error('Error creating weight record:', error);
@@ -116,9 +120,17 @@ const WeighbridgeDashboard = () => {
 
   const openCreateDialog = () => {
     setWeightForm({
-      ...weightForm,
-      weighingDate: new Date().toISOString().split('T')[0]
+      vehicleNumber: '',
+      poNumber: '',
+      material: '',
+      supplierName: '',
+      weightBefore: '',
+      weightAfter: '',
+      netWeight: '',
+      weighingDate: new Date().toISOString().split('T')[0],
+      remarks: ''
     });
+    setAvailableVehicles([]);
     setOpenWeightDialog(true);
   };
 
@@ -127,6 +139,39 @@ const WeighbridgeDashboard = () => {
     const after = parseFloat(weightForm.weightAfter) || 0;
     const net = before - after;
     setWeightForm({ ...weightForm, netWeight: net.toFixed(2) });
+  };
+
+  const fetchVehiclesForPO = async (poNumber) => {
+    try {
+      const gateEntries = await getGateEntriesByPO(poNumber);
+      setAvailableVehicles(gateEntries);
+    } catch (error) {
+      console.error('Error fetching vehicles for PO:', error);
+      setAvailableVehicles([]);
+    }
+  };
+
+  const handlePOSelection = (selectedPO) => {
+    if (selectedPO) {
+      setWeightForm({
+        ...weightForm,
+        poNumber: selectedPO.poNumber,
+        supplierName: selectedPO.supplierName,
+        material: selectedPO.material,
+        vehicleNumber: '' // Reset vehicle number when PO changes
+      });
+      // Fetch vehicles for the selected PO
+      fetchVehiclesForPO(selectedPO.poNumber);
+    } else {
+      setWeightForm({
+        ...weightForm,
+        poNumber: '',
+        supplierName: '',
+        material: '',
+        vehicleNumber: ''
+      });
+      setAvailableVehicles([]);
+    }
   };
 
   return (
@@ -220,35 +265,42 @@ const WeighbridgeDashboard = () => {
         <DialogContent>
           <Grid container spacing={2} sx={{ mt: 1 }}>
             <Grid item xs={12} sm={6}>
-              <TextField
-                fullWidth
-                label="Vehicle Number"
-                value={weightForm.vehicleNumber}
-                onChange={(e) => setWeightForm({ ...weightForm, vehicleNumber: e.target.value })}
-                margin="normal"
-                required
-              />
+              {availableVehicles.length > 0 ? (
+                <TextField
+                  fullWidth
+                  select
+                  label="Vehicle Number"
+                  value={weightForm.vehicleNumber}
+                  onChange={(e) => setWeightForm({ ...weightForm, vehicleNumber: e.target.value })}
+                  margin="normal"
+                  required
+                >
+                  {availableVehicles.map((vehicle) => (
+                    <MenuItem key={vehicle.id} value={vehicle.vehicleNumber}>
+                      {vehicle.vehicleNumber} - {vehicle.driverName} ({new Date(vehicle.entryTime).toLocaleDateString()})
+                    </MenuItem>
+                  ))}
+                </TextField>
+              ) : (
+                <TextField
+                  fullWidth
+                  label="Vehicle Number"
+                  value={weightForm.vehicleNumber}
+                  onChange={(e) => setWeightForm({ ...weightForm, vehicleNumber: e.target.value })}
+                  margin="normal"
+                  required
+                  helperText={
+                    weightForm.poNumber
+                      ? "No vehicles found for this PO. Enter manually or verify gate entry."
+                      : "Select a PO first to see vehicles, or enter manually."
+                  }
+                />
+              )}
             </Grid>
             <Grid item xs={12} sm={6}>
               <POSelector
                 value={weightForm.poNumber ? { poNumber: weightForm.poNumber } : null}
-                onChange={(selectedPO) => {
-                  if (selectedPO) {
-                    setWeightForm({
-                      ...weightForm,
-                      poNumber: selectedPO.poNumber,
-                      supplierName: selectedPO.supplierName,
-                      material: selectedPO.material
-                    });
-                  } else {
-                    setWeightForm({
-                      ...weightForm,
-                      poNumber: '',
-                      supplierName: '',
-                      material: ''
-                    });
-                  }
-                }}
+                onChange={handlePOSelection}
                 label="PO Number"
                 required
                 showDetails={true}

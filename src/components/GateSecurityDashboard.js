@@ -30,7 +30,7 @@ import {
   Visibility,
   Logout
 } from '@mui/icons-material';
-import { collection, getDocs, addDoc, query, where, orderBy } from 'firebase/firestore';
+import { collection, getDocs, addDoc, query, where, orderBy, updateDoc, doc, setDoc, getDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useNavigate } from 'react-router-dom';
 
@@ -82,13 +82,26 @@ const fetchApprovedPOs = async () => {
     try {
       const q = query(
         collection(db, 'gateEntries'),
-        orderBy('entryTime', 'desc')
+        orderBy('createdAt', 'desc')
       );
       const querySnapshot = await getDocs(q);
-      const entriesData = querySnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
+      const entriesData = querySnapshot.docs.map(doc => {
+        const data = doc.data();
+        // Flatten vehicles for display in table
+        const flattenedEntries = [];
+        if (data.vehicles) {
+          Object.values(data.vehicles).forEach(vehicle => {
+            flattenedEntries.push({
+              id: `${doc.id}_${vehicle.vehicleNumber}`,
+              poNumber: doc.id, // Document ID is now the PO number
+              supplierName: data.supplierName,
+              material: data.material,
+              ...vehicle
+            });
+          });
+        }
+        return flattenedEntries;
+      }).flat();
       setGateEntries(entriesData);
     } catch (error) {
       console.error('Error fetching gate entries:', error);
@@ -102,14 +115,47 @@ const fetchApprovedPOs = async () => {
 
   const handleCreateEntry = async () => {
     try {
-      const entryData = {
-        ...entryForm,
-        createdBy: currentUser.uid,
-        createdAt: new Date().toISOString(),
+      const poDocRef = doc(db, 'gateEntries', entryForm.poNumber);
+      const poDoc = await getDoc(poDocRef);
+      
+      const vehicleData = {
+        vehicleNumber: entryForm.vehicleNumber,
+        driverName: entryForm.driverName,
+        driverPhone: entryForm.driverPhone,
+        entryTime: entryForm.entryTime,
+        vehicleChecks: entryForm.vehicleChecks,
+        remarks: entryForm.remarks,
         status: 'Active'
       };
 
-      await addDoc(collection(db, 'gateEntries'), entryData);
+      if (poDoc.exists()) {
+        // Update existing PO document with new vehicle
+        const existingData = poDoc.data();
+        const updatedVehicles = {
+          ...existingData.vehicles,
+          [entryForm.vehicleNumber]: vehicleData
+        };
+        
+        await updateDoc(poDocRef, {
+          vehicles: updatedVehicles,
+          updatedAt: new Date().toISOString()
+        });
+      } else {
+        // Create new PO document
+        const entryData = {
+          poNumber: entryForm.poNumber,
+          supplierName: entryForm.supplierName,
+          material: entryForm.material,
+          vehicles: {
+            [entryForm.vehicleNumber]: vehicleData
+          },
+          createdBy: currentUser.uid,
+          createdAt: new Date().toISOString(),
+          status: 'Active'
+        };
+        
+        await setDoc(poDocRef, entryData);
+      }
       
       // Log activity
       await addDoc(collection(db, 'activityLogs'), {

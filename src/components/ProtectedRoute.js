@@ -3,7 +3,12 @@ import { Navigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 
 const ProtectedRoute = ({ children, allowedRoles = [] }) => {
-  const { currentUser, userRole } = useAuth();
+  const { currentUser, userRole, loading } = useAuth();
+
+  // Wait until auth state is resolved to avoid redirect flicker on refresh
+  if (loading) {
+    return null; // or a spinner component if you have one
+  }
 
   // If no user, redirect to login
   if (!currentUser) {

@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { collection, getDocs, query, orderBy, onSnapshot, where } from 'firebase/firestore';
+import { collection, getDocs, query, orderBy, onSnapshot, where, doc, getDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 
 const POContext = createContext();
@@ -159,6 +159,46 @@ export function POProvider({ children }) {
     };
   };
 
+  // Fetch gate entries by PO number
+  const getGateEntriesByPO = async (poNumber) => {
+    try {
+      const normalizedPONumber = (poNumber || '').toString().trim();
+      if (!normalizedPONumber) return [];
+
+      // First try by document ID (expected schema)
+      const poDocRef = doc(db, 'gateEntries', normalizedPONumber);
+      const poDoc = await getDoc(poDocRef);
+
+      let data = null;
+      if (poDoc.exists()) {
+        data = poDoc.data();
+      } else {
+        // Fallback: some older records may have auto IDs; query by field
+        const q = query(collection(db, 'gateEntries'), where('poNumber', '==', normalizedPONumber));
+        const snapshot = await getDocs(q);
+        if (!snapshot.empty) {
+          data = snapshot.docs[0].data();
+        }
+      }
+
+      if (!data) return [];
+
+      const vehiclesObject = data.vehicles || {};
+      const gateEntries = Object.values(vehiclesObject).map((vehicle) => ({
+        id: `${normalizedPONumber}_${vehicle.vehicleNumber}`,
+        poNumber: normalizedPONumber,
+        supplierName: data.supplierName,
+        material: data.material,
+        ...vehicle
+      }));
+
+      return gateEntries.sort((a, b) => new Date(b.entryTime) - new Date(a.entryTime));
+    } catch (error) {
+      console.error('Error fetching gate entries by PO:', error);
+      return [];
+    }
+  };
+
   const value = {
     purchaseOrders,
     loading,
@@ -174,7 +214,8 @@ export function POProvider({ children }) {
     getUniqueSuppliers,
     getUniqueMaterials,
     getPOStats,
-    fetchPurchaseOrders
+    fetchPurchaseOrders,
+    getGateEntriesByPO
   };
 
   return (
