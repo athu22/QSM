@@ -545,13 +545,29 @@ const AccountsDashboard = () => {
               />
             </Grid>
             <Grid item xs={12} sm={6}>
-              <TextField
-                fullWidth
+              <POSelector
+                value={gnrForm.poNumber ? { poNumber: gnrForm.poNumber } : null}
+                onChange={(selectedPO) => {
+                  if (selectedPO) {
+                    setGnrForm({
+                      ...gnrForm,
+                      poNumber: selectedPO.poNumber,
+                      supplierName: selectedPO.supplierName || gnrForm.supplierName,
+                      material: selectedPO.material || gnrForm.material
+                    });
+                  } else {
+                    setGnrForm({
+                      ...gnrForm,
+                      poNumber: '',
+                      supplierName: '',
+                      material: ''
+                    });
+                  }
+                }}
                 label="PO Number"
-                value={gnrForm.poNumber}
-                onChange={(e) => setGnrForm({ ...gnrForm, poNumber: e.target.value })}
-                margin="normal"
                 required
+                showDetails={true}
+                placeholder="Search PO number..."
               />
             </Grid>
             <Grid item xs={12} sm={6}>
