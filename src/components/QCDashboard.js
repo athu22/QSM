@@ -28,9 +28,10 @@ import {
   CheckCircle,
   Add,
   Visibility,
-  Logout
+  Logout,
+  Edit
 } from '@mui/icons-material';
-import { collection, getDocs, addDoc, query, where, orderBy } from 'firebase/firestore';
+import { collection, getDocs, addDoc, updateDoc, doc, query, where, orderBy } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useNavigate } from 'react-router-dom';
 
@@ -39,12 +40,15 @@ const QCDashboard = () => {
   const navigate = useNavigate();
   const [qcResults, setQcResults] = useState([]);
   const [openQCDialog, setOpenQCDialog] = useState(false);
+  const [editingQC, setEditingQC] = useState(null);
   const [qcForm, setQcForm] = useState({
     poNumber: '',
     material: '',
     supplierName: '',
     testDate: '',
     testResult: 'Pending',
+    purity: '',
+    moisture: '',
     testParameters: '',
     remarks: ''
   });
@@ -83,24 +87,37 @@ const QCDashboard = () => {
         status: 'Active'
       };
 
-      await addDoc(collection(db, 'qcResults'), qcData);
+      if (editingQC) {
+        // Update existing QC result
+        const qcDocRef = doc(db, 'qcResults', editingQC.id);
+        await updateDoc(qcDocRef, {
+          ...qcData,
+          updatedAt: new Date().toISOString()
+        });
+      } else {
+        // Create new QC result
+        await addDoc(collection(db, 'qcResults'), qcData);
+      }
       
       // Log activity
       await addDoc(collection(db, 'activityLogs'), {
-        action: 'QC Test Completed',
+        action: editingQC ? 'QC Test Updated' : 'QC Test Completed',
         userId: currentUser.uid,
         userRole: 'QC Dept',
-        details: `QC test completed for PO ${qcForm.poNumber} - Result: ${qcForm.testResult}`,
+        details: `QC test ${editingQC ? 'updated' : 'completed'} for PO ${qcForm.poNumber} - Result: ${qcForm.testResult}`,
         timestamp: new Date().toISOString()
       });
 
       setOpenQCDialog(false);
+      setEditingQC(null);
       setQcForm({
         poNumber: '',
         material: '',
         supplierName: '',
         testDate: '',
         testResult: 'Pending',
+        purity: '',
+        moisture: '',
         testParameters: '',
         remarks: ''
       });
@@ -111,9 +128,33 @@ const QCDashboard = () => {
   };
 
   const openCreateDialog = () => {
+    setEditingQC(null);
     setQcForm({
-      ...qcForm,
-      testDate: new Date().toISOString().split('T')[0]
+      poNumber: '',
+      material: '',
+      supplierName: '',
+      testDate: new Date().toISOString().split('T')[0],
+      testResult: 'Pending',
+      purity: '',
+      moisture: '',
+      testParameters: '',
+      remarks: ''
+    });
+    setOpenQCDialog(true);
+  };
+
+  const openEditDialog = (qc) => {
+    setEditingQC(qc);
+    setQcForm({
+      poNumber: qc.poNumber,
+      material: qc.material,
+      supplierName: qc.supplierName,
+      testDate: qc.testDate,
+      testResult: qc.testResult,
+      purity: qc.purity || '',
+      moisture: qc.moisture || '',
+      testParameters: qc.testParameters,
+      remarks: qc.remarks
     });
     setOpenQCDialog(true);
   };
@@ -185,7 +226,9 @@ const QCDashboard = () => {
                 <TableCell>Supplier</TableCell>
                 <TableCell>Test Date</TableCell>
                 <TableCell>Test Result</TableCell>
-                <TableCell>Test Parameters</TableCell>
+                <TableCell>Purity (%)</TableCell>
+                <TableCell>Moisture (%)</TableCell>
+                <TableCell>Other Parameters</TableCell>
                 <TableCell>Actions</TableCell>
               </TableRow>
             </TableHead>
@@ -204,15 +247,27 @@ const QCDashboard = () => {
                       {qc.testResult}
                     </Typography>
                   </TableCell>
-                  <TableCell>{qc.testParameters}</TableCell>
+                  <TableCell>{qc.purity || 'N/A'}</TableCell>
+                  <TableCell>{qc.moisture || 'N/A'}</TableCell>
+                  <TableCell>{qc.testParameters || 'N/A'}</TableCell>
                   <TableCell>
-                    <Button
-                      size="small"
-                      startIcon={<Visibility />}
-                      onClick={() => {/* View QC details */}}
-                    >
-                      View
-                    </Button>
+                    <Box sx={{ display: 'flex', gap: 1 }}>
+                      <Button
+                        size="small"
+                        startIcon={<Visibility />}
+                        onClick={() => {/* View QC details */}}
+                      >
+                        View
+                      </Button>
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        startIcon={<Edit />}
+                        onClick={() => openEditDialog(qc)}
+                      >
+                        Edit
+                      </Button>
+                    </Box>
                   </TableCell>
                 </TableRow>
               ))}
@@ -223,7 +278,7 @@ const QCDashboard = () => {
 
       {/* Create QC Result Dialog */}
       <Dialog open={openQCDialog} onClose={() => setOpenQCDialog(false)} maxWidth="md" fullWidth>
-        <DialogTitle>Record QC Test Result</DialogTitle>
+        <DialogTitle>{editingQC ? 'Edit QC Test Result' : 'Record QC Test Result'}</DialogTitle>
         <DialogContent>
           <Grid container spacing={2} sx={{ mt: 1 }}>
             <Grid item xs={12} sm={6}>
@@ -302,12 +357,37 @@ const QCDashboard = () => {
             <Grid item xs={12} sm={6}>
               <TextField
                 fullWidth
-                label="Test Parameters"
+                label="Purity (%)"
+                type="number"
+                value={qcForm.purity}
+                onChange={(e) => setQcForm({ ...qcForm, purity: e.target.value })}
+                margin="normal"
+                required
+                inputProps={{ min: 0, max: 100, step: 0.01 }}
+                placeholder="e.g., 99.5"
+              />
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <TextField
+                fullWidth
+                label="Moisture (%)"
+                type="number"
+                value={qcForm.moisture}
+                onChange={(e) => setQcForm({ ...qcForm, moisture: e.target.value })}
+                margin="normal"
+                required
+                inputProps={{ min: 0, max: 100, step: 0.01 }}
+                placeholder="e.g., 0.1"
+              />
+            </Grid>
+            <Grid item xs={12}>
+              <TextField
+                fullWidth
+                label="Other Test Parameters"
                 value={qcForm.testParameters}
                 onChange={(e) => setQcForm({ ...qcForm, testParameters: e.target.value })}
                 margin="normal"
-                required
-                placeholder="e.g., Purity: 99.5%, Moisture: 0.1%"
+                placeholder="Additional test parameters or notes"
               />
             </Grid>
             <Grid item xs={12}>
@@ -326,7 +406,7 @@ const QCDashboard = () => {
         <DialogActions>
           <Button onClick={() => setOpenQCDialog(false)}>Cancel</Button>
           <Button onClick={handleCreateQCResult} variant="contained">
-            Record Result
+            {editingQC ? 'Update Result' : 'Record Result'}
           </Button>
         </DialogActions>
       </Dialog>

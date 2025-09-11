@@ -30,9 +30,10 @@ import {
   Add,
   Visibility,
   Logout,
-  Print
+  Print,
+  Send
 } from '@mui/icons-material';
-import { collection, getDocs, addDoc, query, where, orderBy } from 'firebase/firestore';
+import { collection, getDocs, addDoc, updateDoc, doc, query, where, orderBy } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useNavigate } from 'react-router-dom';
 import { generatePONumber, validatePONumber, printPurchaseOrder } from '../utils/poUtils';
@@ -44,6 +45,8 @@ const PurchaseTeamDashboard = () => {
   const [openPODialog, setOpenPODialog] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [lastCreatedPO, setLastCreatedPO] = useState(null);
+  const [showSendToWP, setShowSendToWP] = useState(false);
   const [poForm, setPOForm] = useState({
     poNumber: '',
     orderDate: '',
@@ -181,6 +184,10 @@ const PurchaseTeamDashboard = () => {
       // Refresh the purchase orders list
       await fetchPurchaseOrders();
       
+      // Set the last created PO and show Send to WP option
+      setLastCreatedPO(poData);
+      setShowSendToWP(true);
+      
       alert(`Purchase Order ${poForm.poNumber} created successfully!`);
     } catch (error) {
       console.error('Error creating purchase order:', error);
@@ -204,6 +211,37 @@ const PurchaseTeamDashboard = () => {
   };
 
   // Using the utility function from poUtils.js
+
+  const handleSendToWP = async () => {
+    try {
+      if (!lastCreatedPO) return;
+
+      // Update PO status to "Sent to WP"
+      const poDocRef = doc(db, 'purchaseOrders', lastCreatedPO.id || lastCreatedPO.poNumber);
+      await updateDoc(poDocRef, {
+        status: 'Sent to WP',
+        sentToWPAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      });
+
+      // Log activity
+      await addDoc(collection(db, 'activityLogs'), {
+        action: 'PO Sent to Work Process',
+        userId: currentUser?.uid || 'unknown',
+        userRole: 'Purchase Team',
+        details: `PO ${lastCreatedPO.poNumber} sent to Work Process`,
+        timestamp: new Date().toISOString()
+      });
+
+      setShowSendToWP(false);
+      setLastCreatedPO(null);
+      await fetchPurchaseOrders();
+      alert(`Purchase Order ${lastCreatedPO.poNumber} sent to Work Process successfully!`);
+    } catch (error) {
+      console.error('Error sending PO to WP:', error);
+      alert(`Error sending PO to WP: ${error.message}`);
+    }
+  };
 
   const openCreateDialog = () => {
     const newPONumber = generatePONumber();
@@ -260,6 +298,39 @@ const PurchaseTeamDashboard = () => {
           </Card>
         </Grid>
       </Grid>
+
+      {/* Send to WP Button */}
+      {showSendToWP && lastCreatedPO && (
+        <Box sx={{ mb: 3, p: 2, bgcolor: 'success.light', borderRadius: 2 }}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Typography variant="h6" color="success.contrastText">
+              PO {lastCreatedPO.poNumber} created successfully! Send to Work Process?
+            </Typography>
+            <Box sx={{ display: 'flex', gap: 2 }}>
+              <Button
+                variant="contained"
+                color="success"
+                startIcon={<Send />}
+                onClick={handleSendToWP}
+                sx={{ color: 'white' }}
+              >
+                Send to WP
+              </Button>
+              <Button
+                variant="outlined"
+                color="inherit"
+                onClick={() => {
+                  setShowSendToWP(false);
+                  setLastCreatedPO(null);
+                }}
+                sx={{ color: 'white', borderColor: 'white' }}
+              >
+                Dismiss
+              </Button>
+            </Box>
+          </Box>
+        </Box>
+      )}
 
       {/* Purchase Orders */}
       <Paper sx={{ p: 3 }}>

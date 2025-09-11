@@ -30,7 +30,8 @@ import {
   Add,
   Visibility,
   Logout,
-  Payment
+  Payment,
+  Receipt
 } from '@mui/icons-material';
 import { collection, getDocs, addDoc, updateDoc, doc, query, where, orderBy } from 'firebase/firestore';
 import { db } from '../firebase';
@@ -40,7 +41,9 @@ const AccountsDashboard = () => {
   const { logout, currentUser } = useAuth();
     const navigate = useNavigate();
   const [accountsRecords, setAccountsRecords] = useState([]);
+  const [gnrRecords, setGnrRecords] = useState([]);
   const [openPaymentDialog, setOpenPaymentDialog] = useState(false);
+  const [openGNRDialog, setOpenGNRDialog] = useState(false);
   const [selectedRecord, setSelectedRecord] = useState(null);
   const [paymentForm, setPaymentForm] = useState({
     poNumber: '',
@@ -51,9 +54,21 @@ const AccountsDashboard = () => {
     paymentDate: '',
     remarks: ''
   });
+  const [gnrForm, setGnrForm] = useState({
+    gnrNumber: '',
+    poNumber: '',
+    supplierName: '',
+    material: '',
+    quantity: '',
+    receivedDate: '',
+    receivedBy: '',
+    condition: '',
+    remarks: ''
+  });
 
   useEffect(() => {
     fetchAccountsRecords();
+    fetchGNRRecords();
   }, []);
 
   const fetchAccountsRecords = async () => {
@@ -70,6 +85,23 @@ const AccountsDashboard = () => {
       setAccountsRecords(recordsData);
     } catch (error) {
       console.error('Error fetching accounts records:', error);
+    }
+  };
+
+  const fetchGNRRecords = async () => {
+    try {
+      const q = query(
+        collection(db, 'gnr'),
+        orderBy('receivedDate', 'desc')
+      );
+      const querySnapshot = await getDocs(q);
+      const recordsData = querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      setGnrRecords(recordsData);
+    } catch (error) {
+      console.error('Error fetching GNR records:', error);
     }
   };
     const handleLogout = async () => {
@@ -133,6 +165,44 @@ const AccountsDashboard = () => {
     setOpenPaymentDialog(true);
   };
 
+  const handleCreateGNR = async () => {
+    try {
+      const gnrData = {
+        ...gnrForm,
+        createdBy: currentUser.uid,
+        createdAt: new Date().toISOString(),
+        status: 'Active'
+      };
+
+      await addDoc(collection(db, 'gnr'), gnrData);
+      
+      // Log activity
+      await addDoc(collection(db, 'activityLogs'), {
+        action: 'GNR Created',
+        userId: currentUser.uid,
+        userRole: 'Accounts Dept',
+        details: `GNR ${gnrForm.gnrNumber} created for PO ${gnrForm.poNumber}`,
+        timestamp: new Date().toISOString()
+      });
+
+      setOpenGNRDialog(false);
+      setGnrForm({
+        gnrNumber: '',
+        poNumber: '',
+        supplierName: '',
+        material: '',
+        quantity: '',
+        receivedDate: '',
+        receivedBy: '',
+        condition: '',
+        remarks: ''
+      });
+      fetchGNRRecords();
+    } catch (error) {
+      console.error('Error creating GNR:', error);
+    }
+  };
+
   const openCreateDialog = () => {
     setSelectedRecord(null);
     setPaymentForm({
@@ -145,6 +215,21 @@ const AccountsDashboard = () => {
       remarks: ''
     });
     setOpenPaymentDialog(true);
+  };
+
+  const openCreateGNRDialog = () => {
+    setGnrForm({
+      gnrNumber: `GNR-${Date.now()}`,
+      poNumber: '',
+      supplierName: '',
+      material: '',
+      quantity: '',
+      receivedDate: new Date().toISOString().split('T')[0],
+      receivedBy: '',
+      condition: 'Good',
+      remarks: ''
+    });
+    setOpenGNRDialog(true);
   };
 
   const getStatusColor = (status) => {
@@ -253,6 +338,67 @@ const AccountsDashboard = () => {
                         Edit
                       </Button>
                     </Box>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      </Paper>
+
+      {/* GNR Records */}
+      <Paper sx={{ p: 3, mt: 3 }}>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+          <Typography variant="h6">Goods Note Receipt (GNR)</Typography>
+          <Button
+            variant="contained"
+            startIcon={<Receipt />}
+            onClick={openCreateGNRDialog}
+          >
+            Create GNR
+          </Button>
+        </Box>
+        
+        <TableContainer>
+          <Table>
+            <TableHead>
+              <TableRow>
+                <TableCell>GNR Number</TableCell>
+                <TableCell>PO Number</TableCell>
+                <TableCell>Supplier</TableCell>
+                <TableCell>Material</TableCell>
+                <TableCell>Quantity</TableCell>
+                <TableCell>Received Date</TableCell>
+                <TableCell>Received By</TableCell>
+                <TableCell>Condition</TableCell>
+                <TableCell>Actions</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {gnrRecords.map((gnr) => (
+                <TableRow key={gnr.id}>
+                  <TableCell>{gnr.gnrNumber}</TableCell>
+                  <TableCell>{gnr.poNumber}</TableCell>
+                  <TableCell>{gnr.supplierName}</TableCell>
+                  <TableCell>{gnr.material}</TableCell>
+                  <TableCell>{gnr.quantity}</TableCell>
+                  <TableCell>{new Date(gnr.receivedDate).toLocaleDateString()}</TableCell>
+                  <TableCell>{gnr.receivedBy}</TableCell>
+                  <TableCell>
+                    <Chip 
+                      label={gnr.condition} 
+                      color={gnr.condition === 'Good' ? 'success' : gnr.condition === 'Damaged' ? 'error' : 'warning'}
+                      size="small"
+                    />
+                  </TableCell>
+                  <TableCell>
+                    <Button
+                      size="small"
+                      startIcon={<Visibility />}
+                      onClick={() => {/* View GNR details */}}
+                    >
+                      View
+                    </Button>
                   </TableCell>
                 </TableRow>
               ))}
@@ -370,6 +516,120 @@ const AccountsDashboard = () => {
           <Button onClick={() => setOpenPaymentDialog(false)}>Cancel</Button>
           <Button onClick={handleCreatePayment} variant="contained">
             {selectedRecord ? 'Update Payment Record' : 'Process Payment'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* GNR Dialog */}
+      <Dialog open={openGNRDialog} onClose={() => setOpenGNRDialog(false)} maxWidth="md" fullWidth>
+        <DialogTitle>Create Goods Note Receipt (GNR)</DialogTitle>
+        <DialogContent>
+          <Grid container spacing={2} sx={{ mt: 1 }}>
+            <Grid item xs={12} sm={6}>
+              <TextField
+                fullWidth
+                label="GNR Number"
+                value={gnrForm.gnrNumber}
+                InputProps={{ readOnly: true }}
+                margin="normal"
+                required
+              />
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <TextField
+                fullWidth
+                label="PO Number"
+                value={gnrForm.poNumber}
+                onChange={(e) => setGnrForm({ ...gnrForm, poNumber: e.target.value })}
+                margin="normal"
+                required
+              />
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <TextField
+                fullWidth
+                label="Supplier Name"
+                value={gnrForm.supplierName}
+                onChange={(e) => setGnrForm({ ...gnrForm, supplierName: e.target.value })}
+                margin="normal"
+                required
+              />
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <TextField
+                fullWidth
+                label="Material"
+                value={gnrForm.material}
+                onChange={(e) => setGnrForm({ ...gnrForm, material: e.target.value })}
+                margin="normal"
+                required
+              />
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <TextField
+                fullWidth
+                label="Quantity"
+                type="number"
+                value={gnrForm.quantity}
+                onChange={(e) => setGnrForm({ ...gnrForm, quantity: e.target.value })}
+                margin="normal"
+                required
+              />
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <TextField
+                fullWidth
+                label="Received Date"
+                type="date"
+                value={gnrForm.receivedDate}
+                onChange={(e) => setGnrForm({ ...gnrForm, receivedDate: e.target.value })}
+                margin="normal"
+                InputLabelProps={{ shrink: true }}
+                required
+              />
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <TextField
+                fullWidth
+                label="Received By"
+                value={gnrForm.receivedBy}
+                onChange={(e) => setGnrForm({ ...gnrForm, receivedBy: e.target.value })}
+                margin="normal"
+                required
+              />
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <TextField
+                fullWidth
+                select
+                label="Condition"
+                value={gnrForm.condition}
+                onChange={(e) => setGnrForm({ ...gnrForm, condition: e.target.value })}
+                margin="normal"
+                required
+              >
+                <MenuItem value="Good">Good</MenuItem>
+                <MenuItem value="Damaged">Damaged</MenuItem>
+                <MenuItem value="Partial">Partial</MenuItem>
+              </TextField>
+            </Grid>
+            <Grid item xs={12}>
+              <TextField
+                fullWidth
+                label="Remarks"
+                value={gnrForm.remarks}
+                onChange={(e) => setGnrForm({ ...gnrForm, remarks: e.target.value })}
+                margin="normal"
+                multiline
+                rows={3}
+              />
+            </Grid>
+          </Grid>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setOpenGNRDialog(false)}>Cancel</Button>
+          <Button onClick={handleCreateGNR} variant="contained">
+            Create GNR
           </Button>
         </DialogActions>
       </Dialog>

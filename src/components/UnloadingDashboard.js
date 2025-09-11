@@ -36,9 +36,11 @@ import { useNavigate } from 'react-router-dom';
 
 const UnloadingDashboard = () => {
   const { logout, currentUser } = useAuth();
+  const { getGateEntriesByPO } = usePO();
   const navigate = useNavigate();
   const [unloadingRecords, setUnloadingRecords] = useState([]);
   const [openUnloadingDialog, setOpenUnloadingDialog] = useState(false);
+  const [availableVehicles, setAvailableVehicles] = useState([]);
   const [unloadingForm, setUnloadingForm] = useState({
     vehicleNumber: '',
     poNumber: '',
@@ -114,13 +116,61 @@ const UnloadingDashboard = () => {
     }
   };
 
+  const fetchVehiclesForPO = async (poNumber) => {
+    try {
+      const gateEntries = await getGateEntriesByPO(poNumber);
+      setAvailableVehicles(gateEntries);
+      
+      // Automatically select the first available vehicle if only one is found
+      if (gateEntries.length === 1) {
+        setUnloadingForm(prev => ({
+          ...prev,
+          vehicleNumber: gateEntries[0].vehicleNumber
+        }));
+      }
+    } catch (error) {
+      console.error('Error fetching vehicles for PO:', error);
+      setAvailableVehicles([]);
+    }
+  };
+
+  const handlePOSelection = (selectedPO) => {
+    if (selectedPO) {
+      setUnloadingForm({
+        ...unloadingForm,
+        poNumber: selectedPO.poNumber,
+        supplierName: selectedPO.supplierName,
+        material: selectedPO.material,
+        vehicleNumber: '' // Reset vehicle number when PO changes
+      });
+      // Fetch vehicles for the selected PO
+      fetchVehiclesForPO(selectedPO.poNumber);
+    } else {
+      setUnloadingForm({
+        ...unloadingForm,
+        poNumber: '',
+        supplierName: '',
+        material: '',
+        vehicleNumber: ''
+      });
+      setAvailableVehicles([]);
+    }
+  };
+
   const openCreateDialog = () => {
     const now = new Date();
     setUnloadingForm({
-      ...unloadingForm,
+      vehicleNumber: '',
+      poNumber: '',
+      material: '',
+      supplierName: '',
       unloadingStartTime: now.toISOString().slice(0, 16),
-      unloadingEndTime: now.toISOString().slice(0, 16)
+      unloadingEndTime: now.toISOString().slice(0, 16),
+      storageLocation: '',
+      quantityUnloaded: '',
+      remarks: ''
     });
+    setAvailableVehicles([]);
     setOpenUnloadingDialog(true);
   };
 
@@ -215,35 +265,42 @@ const UnloadingDashboard = () => {
         <DialogContent>
           <Grid container spacing={2} sx={{ mt: 1 }}>
             <Grid item xs={12} sm={6}>
-              <TextField
-                fullWidth
-                label="Vehicle Number"
-                value={unloadingForm.vehicleNumber}
-                onChange={(e) => setUnloadingForm({ ...unloadingForm, vehicleNumber: e.target.value })}
-                margin="normal"
-                required
-              />
+              {availableVehicles.length > 0 ? (
+                <TextField
+                  fullWidth
+                  select
+                  label="Vehicle Number"
+                  value={unloadingForm.vehicleNumber}
+                  onChange={(e) => setUnloadingForm({ ...unloadingForm, vehicleNumber: e.target.value })}
+                  margin="normal"
+                  required
+                >
+                  {availableVehicles.map((vehicle) => (
+                    <MenuItem key={vehicle.id} value={vehicle.vehicleNumber}>
+                      {vehicle.vehicleNumber} - {vehicle.driverName} ({new Date(vehicle.entryTime).toLocaleDateString()})
+                    </MenuItem>
+                  ))}
+                </TextField>
+              ) : (
+                <TextField
+                  fullWidth
+                  label="Vehicle Number"
+                  value={unloadingForm.vehicleNumber}
+                  onChange={(e) => setUnloadingForm({ ...unloadingForm, vehicleNumber: e.target.value })}
+                  margin="normal"
+                  required
+                  helperText={
+                    unloadingForm.poNumber
+                      ? "No vehicles found for this PO. Enter manually or verify gate entry."
+                      : "Select a PO first to see vehicles, or enter manually."
+                  }
+                />
+              )}
             </Grid>
             <Grid item xs={12} sm={6}>
               <POSelector
                 value={unloadingForm.poNumber ? { poNumber: unloadingForm.poNumber } : null}
-                onChange={(selectedPO) => {
-                  if (selectedPO) {
-                    setUnloadingForm({
-                      ...unloadingForm,
-                      poNumber: selectedPO.poNumber,
-                      supplierName: selectedPO.supplierName,
-                      material: selectedPO.material
-                    });
-                  } else {
-                    setUnloadingForm({
-                      ...unloadingForm,
-                      poNumber: '',
-                      supplierName: '',
-                      material: ''
-                    });
-                  }
-                }}
+                onChange={handlePOSelection}
                 label="PO Number"
                 required
                 showDetails={true}
@@ -273,13 +330,24 @@ const UnloadingDashboard = () => {
             <Grid item xs={12} sm={6}>
               <TextField
                 fullWidth
+                select
                 label="Storage Location"
                 value={unloadingForm.storageLocation}
                 onChange={(e) => setUnloadingForm({ ...unloadingForm, storageLocation: e.target.value })}
                 margin="normal"
                 required
-                placeholder="e.g., Warehouse A, Section 1"
-              />
+              >
+                <MenuItem value="L1">L1</MenuItem>
+                <MenuItem value="L2">L2</MenuItem>
+                <MenuItem value="L3">L3</MenuItem>
+                <MenuItem value="L4">L4</MenuItem>
+                <MenuItem value="L5">L5</MenuItem>
+                <MenuItem value="L6">L6</MenuItem>
+                <MenuItem value="L7">L7</MenuItem>
+                <MenuItem value="L8">L8</MenuItem>
+                <MenuItem value="L9">L9</MenuItem>
+                <MenuItem value="L10">L10</MenuItem>
+              </TextField>
             </Grid>
             <Grid item xs={12} sm={6}>
               <TextField

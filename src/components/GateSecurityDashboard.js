@@ -28,7 +28,8 @@ import {
   Security,
   Add,
   Visibility,
-  Logout
+  Logout,
+  Edit
 } from '@mui/icons-material';
 import { collection, getDocs, addDoc, query, where, orderBy, updateDoc, doc, setDoc, getDoc } from 'firebase/firestore';
 import { db } from '../firebase';
@@ -41,6 +42,7 @@ const GateSecurityDashboard = () => {
   const [gateEntries, setGateEntries] = useState([]);
   const [openEntryDialog, setOpenEntryDialog] = useState(false);
   const [approvedPOs, setApprovedPOs] = useState([]);
+  const [editingEntry, setEditingEntry] = useState(null);
   const [entryForm, setEntryForm] = useState({
     vehicleNumber: '',
     driverName: '',
@@ -159,14 +161,15 @@ const fetchApprovedPOs = async () => {
       
       // Log activity
       await addDoc(collection(db, 'activityLogs'), {
-        action: 'Gate Entry Recorded',
+        action: editingEntry ? 'Gate Entry Updated' : 'Gate Entry Recorded',
         userId: currentUser.uid,
         userRole: 'Gate Security',
-        details: `Vehicle ${entryForm.vehicleNumber} entered for PO ${entryForm.poNumber}`,
+        details: `Vehicle ${entryForm.vehicleNumber} ${editingEntry ? 'updated' : 'entered'} for PO ${entryForm.poNumber}`,
         timestamp: new Date().toISOString()
       });
 
       setOpenEntryDialog(false);
+      setEditingEntry(null);
       setEntryForm({
         vehicleNumber: '',
         driverName: '',
@@ -185,9 +188,33 @@ const fetchApprovedPOs = async () => {
   };
 
   const openCreateDialog = () => {
+    setEditingEntry(null);
     setEntryForm({
-      ...entryForm,
-      entryTime: new Date().toISOString().slice(0, 16)
+      vehicleNumber: '',
+      driverName: '',
+      driverPhone: '',
+      poNumber: '',
+      supplierName: '',
+      material: '',
+      entryTime: new Date().toISOString().slice(0, 16),
+      vehicleChecks: '',
+      remarks: ''
+    });
+    setOpenEntryDialog(true);
+  };
+
+  const openEditDialog = (entry) => {
+    setEditingEntry(entry);
+    setEntryForm({
+      vehicleNumber: entry.vehicleNumber,
+      driverName: entry.driverName,
+      driverPhone: entry.driverPhone,
+      poNumber: entry.poNumber,
+      supplierName: entry.supplierName,
+      material: entry.material,
+      entryTime: entry.entryTime,
+      vehicleChecks: entry.vehicleChecks,
+      remarks: entry.remarks
     });
     setOpenEntryDialog(true);
   };
@@ -296,13 +323,23 @@ const fetchApprovedPOs = async () => {
                   <TableCell>{new Date(entry.entryTime).toLocaleString()}</TableCell>
                   <TableCell>{entry.vehicleChecks}</TableCell>
                   <TableCell>
-                    <Button
-                      size="small"
-                      startIcon={<Visibility />}
-                      onClick={() => {/* View entry details */}}
-                    >
-                      View
-                    </Button>
+                    <Box sx={{ display: 'flex', gap: 1 }}>
+                      <Button
+                        size="small"
+                        startIcon={<Visibility />}
+                        onClick={() => {/* View entry details */}}
+                      >
+                        View
+                      </Button>
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        startIcon={<Edit />}
+                        onClick={() => openEditDialog(entry)}
+                      >
+                        Edit
+                      </Button>
+                    </Box>
                   </TableCell>
                 </TableRow>
               ))}
@@ -313,7 +350,7 @@ const fetchApprovedPOs = async () => {
 
       {/* Create Entry Dialog */}
       <Dialog open={openEntryDialog} onClose={() => setOpenEntryDialog(false)} maxWidth="md" fullWidth>
-        <DialogTitle>Record Gate Entry</DialogTitle>
+        <DialogTitle>{editingEntry ? 'Edit Gate Entry' : 'Record Gate Entry'}</DialogTitle>
         <DialogContent>
           <Grid container spacing={2} sx={{ mt: 1 }}>
             <Grid item xs={12} sm={6}>
@@ -435,7 +472,7 @@ const fetchApprovedPOs = async () => {
         <DialogActions>
           <Button onClick={() => setOpenEntryDialog(false)}>Cancel</Button>
           <Button onClick={handleCreateEntry} variant="contained">
-            Record Entry
+            {editingEntry ? 'Update Entry' : 'Record Entry'}
           </Button>
         </DialogActions>
       </Dialog>

@@ -162,6 +162,12 @@ function App() {
               path="/dashboard" 
               element={<RoleBasedRedirect />} 
             />
+            
+            {/* Catch-all route for handling direct URL access */}
+            <Route 
+              path="*" 
+              element={<Navigate to="/login" replace />} 
+            />
                       </Routes>
           </Router>
         </POProvider>

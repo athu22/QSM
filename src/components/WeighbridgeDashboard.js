@@ -145,6 +145,14 @@ const WeighbridgeDashboard = () => {
     try {
       const gateEntries = await getGateEntriesByPO(poNumber);
       setAvailableVehicles(gateEntries);
+      
+      // Automatically select the first available vehicle if only one is found
+      if (gateEntries.length === 1) {
+        setWeightForm(prev => ({
+          ...prev,
+          vehicleNumber: gateEntries[0].vehicleNumber
+        }));
+      }
     } catch (error) {
       console.error('Error fetching vehicles for PO:', error);
       setAvailableVehicles([]);
