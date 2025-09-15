@@ -21,7 +21,6 @@ import AdminSetup from './components/AdminSetup';
 import FirebaseTest from './components/FirebaseTest';
 import FirebaseStatus from './components/FirebaseStatus';
 import ErrorBoundary from './components/ErrorBoundary';
-import GNRView from './components/GNRView';
 
 const theme = createTheme({
   palette: {
@@ -159,14 +158,6 @@ function App() {
             />
 
             {/* GNR - View only */}
-            <Route 
-              path="/gnr" 
-              element={
-                <ProtectedRoute allowedRoles={['Admin', 'Manager', 'Purchase Team', 'QC Dept', 'Accounts Dept', 'Gate Security', 'Weighbridge Operator', 'Unloading Dept', 'Sample Dept', 'Vendor']}>
-                  <GNRView />
-                </ProtectedRoute>
-              } 
-            />
             
             {/* Default redirect based on role */}
             <Route 

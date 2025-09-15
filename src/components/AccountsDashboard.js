@@ -1,7 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { usePO } from '../contexts/POContext';
-import POSelector from './POSelector';
 import {
   Container,
   Grid,
@@ -22,7 +20,6 @@ import {
   DialogContent,
   DialogActions,
   TextField,
-  MenuItem,
   Chip
 } from '@mui/material';
 import {
@@ -33,9 +30,10 @@ import {
   Payment,
   Receipt
 } from '@mui/icons-material';
-import { collection, getDocs, addDoc, updateDoc, doc, query, where, orderBy } from 'firebase/firestore';
+import { collection, getDocs, addDoc, query,  orderBy } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useNavigate } from 'react-router-dom';
+import { generateGNRFromPO } from '../utils/gnrUtils';
 
 const AccountsDashboard = () => {
   const { logout, currentUser } = useAuth();
@@ -44,7 +42,9 @@ const AccountsDashboard = () => {
   const [gnrRecords, setGnrRecords] = useState([]);
   const [openPaymentDialog, setOpenPaymentDialog] = useState(false);
   const [openGNRDialog, setOpenGNRDialog] = useState(false);
+  const [openViewDialog, setOpenViewDialog] = useState(false);
   const [selectedRecord, setSelectedRecord] = useState(null);
+  const [selectedGNR, setSelectedGNR] = useState(null);
   const [paymentForm, setPaymentForm] = useState({
     poNumber: '',
     supplierName: '',
@@ -135,7 +135,7 @@ const AccountsDashboard = () => {
         timestamp: new Date().toISOString()
       });
 
-      setOpenPaymentDialog(false);
+
       setPaymentForm({
         poNumber: '',
         supplierName: '',
@@ -232,6 +232,14 @@ const AccountsDashboard = () => {
     setOpenGNRDialog(true);
   };
 
+  const handleViewRecord = (record) => {
+    setSelectedRecord(record);
+    // Generate GNR details from PO data
+    const gnrData = generateGNRFromPO(record);
+    setSelectedGNR(gnrData);
+    setOpenViewDialog(true);
+  };
+
   const getStatusColor = (status) => {
     switch (status) {
       case 'Processed':
@@ -325,7 +333,7 @@ const AccountsDashboard = () => {
                       <Button
                         size="small"
                         startIcon={<Visibility />}
-                        onClick={() => {/* View payment details */}}
+                        onClick={() => handleViewRecord(record)}
                       >
                         View
                       </Button>
@@ -416,246 +424,217 @@ const AccountsDashboard = () => {
         </TableContainer>
       </Paper>
 
-      {/* Payment Dialog */}
-      <Dialog open={openPaymentDialog} onClose={() => setOpenPaymentDialog(false)} maxWidth="md" fullWidth>
+      {/* View Details Dialog */}
+      <Dialog open={openViewDialog} onClose={() => setOpenViewDialog(false)} maxWidth="lg" fullWidth>
         <DialogTitle>
-          {selectedRecord ? 'Edit Payment Record' : 'Process New Payment'}
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Receipt color="primary" />
+            PO Details with Auto-Generated GNR
+          </Box>
         </DialogTitle>
         <DialogContent>
-          <Grid container spacing={2} sx={{ mt: 1 }}>
-            <Grid item xs={12} sm={6}>
-              <POSelector
-                value={paymentForm.poNumber ? { poNumber: paymentForm.poNumber } : null}
-                onChange={(selectedPO) => {
-                  if (selectedPO) {
-                    setPaymentForm({
-                      ...paymentForm,
-                      poNumber: selectedPO.poNumber,
-                      supplierName: selectedPO.supplierName,
-                      material: selectedPO.material
-                    });
-                  } else {
-                    setPaymentForm({
-                      ...paymentForm,
-                      poNumber: '',
-                      supplierName: '',
-                      material: ''
-                    });
-                  }
-                }}
-                label="PO Number"
-                required
-                showDetails={true}
-                placeholder="Search PO number..."
-              />
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <TextField
-                fullWidth
-                label="Supplier Name"
-                value={paymentForm.supplierName}
-                onChange={(e) => setPaymentForm({ ...paymentForm, supplierName: e.target.value })}
-                margin="normal"
-                required
-              />
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <TextField
-                fullWidth
-                label="Material"
-                value={paymentForm.material}
-                onChange={(e) => setPaymentForm({ ...paymentForm, material: e.target.value })}
-                margin="normal"
-                required
-              />
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <TextField
-                fullWidth
-                label="Amount (₹)"
-                type="number"
-                value={paymentForm.amount}
-                onChange={(e) => setPaymentForm({ ...paymentForm, amount: e.target.value })}
-                margin="normal"
-                required
-              />
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <TextField
-                fullWidth
-                select
-                label="Payment Method"
-                value={paymentForm.paymentMethod}
-                onChange={(e) => setPaymentForm({ ...paymentForm, paymentMethod: e.target.value })}
-                margin="normal"
-                required
-              >
-                <MenuItem value="Bank Transfer">Bank Transfer</MenuItem>
-                <MenuItem value="Cheque">Cheque</MenuItem>
-                <MenuItem value="Cash">Cash</MenuItem>
-                <MenuItem value="Online Payment">Online Payment</MenuItem>
-              </TextField>
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <TextField
-                fullWidth
-                label="Payment Date"
-                type="date"
-                value={paymentForm.paymentDate}
-                onChange={(e) => setPaymentForm({ ...paymentForm, paymentDate: e.target.value })}
-                margin="normal"
-                InputLabelProps={{ shrink: true }}
-                required
-              />
-            </Grid>
-            <Grid item xs={12}>
-              <TextField
-                fullWidth
-                label="Remarks"
-                value={paymentForm.remarks}
-                onChange={(e) => setPaymentForm({ ...paymentForm, remarks: e.target.value })}
-                margin="normal"
-                multiline
-                rows={3}
-              />
-            </Grid>
-          </Grid>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setOpenPaymentDialog(false)}>Cancel</Button>
-          <Button onClick={handleCreatePayment} variant="contained">
-            {selectedRecord ? 'Update Payment Record' : 'Process Payment'}
-          </Button>
-        </DialogActions>
-      </Dialog>
+          {selectedRecord && selectedGNR && (
+            <Grid container spacing={3} sx={{ mt: 1 }}>
+              {/* PO Details Section */}
+              <Grid item xs={12}>
+                <Typography variant="h6" gutterBottom color="primary">
+                  Purchase Order Details
+                </Typography>
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  fullWidth
+                  label="PO Number"
+                  value={selectedRecord.poNumber}
+                  InputProps={{ readOnly: true }}
+                  margin="normal"
+                />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  fullWidth
+                  label="Supplier Name"
+                  value={selectedRecord.supplierName}
+                  InputProps={{ readOnly: true }}
+                  margin="normal"
+                />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  fullWidth
+                  label="Material"
+                  value={selectedRecord.material}
+                  InputProps={{ readOnly: true }}
+                  margin="normal"
+                />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  fullWidth
+                  label="Amount (₹)"
+                  value={selectedRecord.amount}
+                  InputProps={{ readOnly: true }}
+                  margin="normal"
+                />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  fullWidth
+                  label="Payment Method"
+                  value={selectedRecord.paymentMethod}
+                  InputProps={{ readOnly: true }}
+                  margin="normal"
+                />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  fullWidth
+                  label="Payment Date"
+                  value={new Date(selectedRecord.paymentDate).toLocaleDateString()}
+                  InputProps={{ readOnly: true }}
+                  margin="normal"
+                />
+              </Grid>
+              <Grid item xs={12}>
+                <TextField
+                  fullWidth
+                  label="Status"
+                  value={selectedRecord.status}
+                  InputProps={{ readOnly: true }}
+                  margin="normal"
+                />
+              </Grid>
 
-      {/* GNR Dialog */}
-      <Dialog open={openGNRDialog} onClose={() => setOpenGNRDialog(false)} maxWidth="md" fullWidth>
-        <DialogTitle>Create Goods Note Receipt (GNR)</DialogTitle>
-        <DialogContent>
-          <Grid container spacing={2} sx={{ mt: 1 }}>
-            <Grid item xs={12} sm={6}>
-              <TextField
-                fullWidth
-                label="GNR Number"
-                value={gnrForm.gnrNumber}
-                InputProps={{ readOnly: true }}
-                margin="normal"
-                required
-              />
+              {/* GNR Details Section */}
+              <Grid item xs={12}>
+                <Typography variant="h6" gutterBottom color="secondary" sx={{ mt: 2 }}>
+                  Auto-Generated GNR Details
+                </Typography>
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  fullWidth
+                  label="GNR Number"
+                  value={selectedGNR.gnrNumber}
+                  InputProps={{ readOnly: true }}
+                  margin="normal"
+                />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  fullWidth
+                  label="PO Number"
+                  value={selectedGNR.poNumber}
+                  InputProps={{ readOnly: true }}
+                  margin="normal"
+                />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  fullWidth
+                  label="Supplier Name"
+                  value={selectedGNR.supplierName}
+                  InputProps={{ readOnly: true }}
+                  margin="normal"
+                />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  fullWidth
+                  label="Material"
+                  value={selectedGNR.material}
+                  InputProps={{ readOnly: true }}
+                  margin="normal"
+                />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  fullWidth
+                  label="Quantity"
+                  value={`${selectedGNR.quantity} ${selectedGNR.unit}`}
+                  InputProps={{ readOnly: true }}
+                  margin="normal"
+                />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  fullWidth
+                  label="Received Date"
+                  value={selectedGNR.receivedDate}
+                  InputProps={{ readOnly: true }}
+                  margin="normal"
+                />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  fullWidth
+                  label="Received By"
+                  value={selectedGNR.receivedBy}
+                  InputProps={{ readOnly: true }}
+                  margin="normal"
+                />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  fullWidth
+                  label="Condition"
+                  value={selectedGNR.condition}
+                  InputProps={{ readOnly: true }}
+                  margin="normal"
+                />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  fullWidth
+                  label="Storage Location"
+                  value={selectedGNR.storageLocation}
+                  InputProps={{ readOnly: true }}
+                  margin="normal"
+                />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  fullWidth
+                  label="Vehicle Number"
+                  value={selectedGNR.vehicleNumber}
+                  InputProps={{ readOnly: true }}
+                  margin="normal"
+                />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  fullWidth
+                  label="Driver Name"
+                  value={selectedGNR.driverName}
+                  InputProps={{ readOnly: true }}
+                  margin="normal"
+                />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  fullWidth
+                  label="Driver Phone"
+                  value={selectedGNR.driverPhone}
+                  InputProps={{ readOnly: true }}
+                  margin="normal"
+                />
+              </Grid>
+              <Grid item xs={12}>
+                <TextField
+                  fullWidth
+                  label="Remarks"
+                  value={selectedGNR.remarks}
+                  InputProps={{ readOnly: true }}
+                  margin="normal"
+                  multiline
+                  rows={3}
+                />
+              </Grid>
             </Grid>
-            <Grid item xs={12} sm={6}>
-              <POSelector
-                value={gnrForm.poNumber ? { poNumber: gnrForm.poNumber } : null}
-                onChange={(selectedPO) => {
-                  if (selectedPO) {
-                    setGnrForm({
-                      ...gnrForm,
-                      poNumber: selectedPO.poNumber,
-                      supplierName: selectedPO.supplierName || gnrForm.supplierName,
-                      material: selectedPO.material || gnrForm.material
-                    });
-                  } else {
-                    setGnrForm({
-                      ...gnrForm,
-                      poNumber: '',
-                      supplierName: '',
-                      material: ''
-                    });
-                  }
-                }}
-                label="PO Number"
-                required
-                showDetails={true}
-                placeholder="Search PO number..."
-              />
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <TextField
-                fullWidth
-                label="Supplier Name"
-                value={gnrForm.supplierName}
-                onChange={(e) => setGnrForm({ ...gnrForm, supplierName: e.target.value })}
-                margin="normal"
-                required
-              />
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <TextField
-                fullWidth
-                label="Material"
-                value={gnrForm.material}
-                onChange={(e) => setGnrForm({ ...gnrForm, material: e.target.value })}
-                margin="normal"
-                required
-              />
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <TextField
-                fullWidth
-                label="Quantity"
-                type="number"
-                value={gnrForm.quantity}
-                onChange={(e) => setGnrForm({ ...gnrForm, quantity: e.target.value })}
-                margin="normal"
-                required
-              />
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <TextField
-                fullWidth
-                label="Received Date"
-                type="date"
-                value={gnrForm.receivedDate}
-                onChange={(e) => setGnrForm({ ...gnrForm, receivedDate: e.target.value })}
-                margin="normal"
-                InputLabelProps={{ shrink: true }}
-                required
-              />
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <TextField
-                fullWidth
-                label="Received By"
-                value={gnrForm.receivedBy}
-                onChange={(e) => setGnrForm({ ...gnrForm, receivedBy: e.target.value })}
-                margin="normal"
-                required
-              />
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <TextField
-                fullWidth
-                select
-                label="Condition"
-                value={gnrForm.condition}
-                onChange={(e) => setGnrForm({ ...gnrForm, condition: e.target.value })}
-                margin="normal"
-                required
-              >
-                <MenuItem value="Good">Good</MenuItem>
-                <MenuItem value="Damaged">Damaged</MenuItem>
-                <MenuItem value="Partial">Partial</MenuItem>
-              </TextField>
-            </Grid>
-            <Grid item xs={12}>
-              <TextField
-                fullWidth
-                label="Remarks"
-                value={gnrForm.remarks}
-                onChange={(e) => setGnrForm({ ...gnrForm, remarks: e.target.value })}
-                margin="normal"
-                multiline
-                rows={3}
-              />
-            </Grid>
-          </Grid>
+          )}
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setOpenGNRDialog(false)}>Cancel</Button>
-          <Button onClick={handleCreateGNR} variant="contained">
-            Create GNR
-          </Button>
+          <Button onClick={() => setOpenViewDialog(false)}>Close</Button>
         </DialogActions>
       </Dialog>
     </Container>
@@ -663,3 +642,5 @@ const AccountsDashboard = () => {
 };
 
 export default AccountsDashboard;
+
+  
