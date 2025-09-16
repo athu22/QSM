@@ -20,15 +20,14 @@ import {
   DialogContent,
   DialogActions,
   TextField,
-  Chip,
-  IconButton
 } from '@mui/material';
 import {
   ThumbUp,
   ThumbDown,
   Visibility,
   Logout,
-  Assessment
+  Assessment,
+  Description
 } from '@mui/icons-material';
 import { collection, getDocs, updateDoc, doc, addDoc, query, where, orderBy } from 'firebase/firestore';
 import { db } from '../firebase';
@@ -39,6 +38,7 @@ const ManagerDashboard = () => {
   const navigate = useNavigate();
   const [pendingPOs, setPendingPOs] = useState([]);
   const [openPODialog, setOpenPODialog] = useState(false);
+  const [openViewDialog, setOpenViewDialog] = useState(false);
   const [selectedPO, setSelectedPO] = useState(null);
   const [approvalForm, setApprovalForm] = useState({
     status: '',
@@ -48,14 +48,21 @@ const ManagerDashboard = () => {
   useEffect(() => {
     fetchPendingPOs();
   }, []);
-    const handleLogout = async () => {
+
+  const handleLogout = async () => {
     try {
       await logout();
-      navigate('/login'); // Redirect to login page
+      navigate('/login');
     } catch (error) {
       console.error('Error during logout:', error);
       navigate('/login');
     }
+  };
+
+
+  const openViewDetails = (po) => {
+    setSelectedPO(po);
+    setOpenViewDialog(true);
   };
 
   const fetchPendingPOs = async () => {
@@ -86,7 +93,6 @@ const ManagerDashboard = () => {
         updatedAt: new Date().toISOString()
       });
 
-      // Log activity
       await addDoc(collection(db, 'activityLogs'), {
         action: `PO ${approvalForm.status}`,
         userId: currentUser.uid,
@@ -110,74 +116,95 @@ const ManagerDashboard = () => {
     setOpenPODialog(true);
   };
 
-  const getStatusColor = (status) => {
-    switch (status) {
-      case 'Pending':
-        return 'warning';
-      case 'Approved':
-        return 'success';
-      case 'Rejected':
-        return 'error';
-      default:
-        return 'default';
-    }
-  };
-
   return (
-    <Container maxWidth="xl">
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-        <Typography variant="h4" component="h1">
+    <Container maxWidth="xl" sx={{ py: 4 }}>
+      {/* Header */}
+      <Box
+        sx={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          mb: 4,
+          p: 2,
+          background: 'linear-gradient(90deg, #1976d2, #42a5f5)',
+          borderRadius: 2,
+          boxShadow: 3,
+          color: 'white'
+        }}
+      >
+        <Typography variant="h4" fontWeight="bold">
           Manager Dashboard
         </Typography>
         <Button
-          variant="outlined"
+          variant="contained"
+          color="error"
           startIcon={<Logout />}
           onClick={handleLogout}
+          sx={{ borderRadius: 2 }}
         >
           Logout
         </Button>
       </Box>
 
-      {/* Stats Card */}
+      {/* Stats Cards */}
       <Grid container spacing={3} sx={{ mb: 4 }}>
         <Grid item xs={12} sm={6} md={3}>
-          <Card>
-            <CardContent>
-              <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                <Assessment sx={{ fontSize: 40, color: 'warning.main', mr: 2 }} />
-                <Box>
-                  <Typography variant="h4">{pendingPOs.length}</Typography>
-                  <Typography variant="body2" color="text.secondary">Pending Approvals</Typography>
-                </Box>
+          <Card
+            sx={{
+              p: 2,
+              borderRadius: 3,
+              boxShadow: 4,
+              transition: '0.3s',
+              '&:hover': { transform: 'scale(1.05)', boxShadow: 6 }
+            }}
+          >
+            <CardContent sx={{ display: 'flex', alignItems: 'center' }}>
+              <Assessment sx={{ fontSize: 50, color: '#f57c00', mr: 2 }} />
+              <Box>
+                <Typography variant="h4" fontWeight="bold">
+                  {pendingPOs.length}
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Pending Approvals
+                </Typography>
               </Box>
             </CardContent>
           </Card>
         </Grid>
       </Grid>
 
-      {/* Pending Purchase Orders */}
-      <Paper sx={{ p: 3 }}>
-        <Typography variant="h6" sx={{ mb: 2 }}>
-          Pending Purchase Orders for Approval
+      {/* Table */}
+       <Paper
+        sx={{
+          p: 3,
+          borderRadius: 3,
+          boxShadow: 4,
+          backgroundColor: '#fafafa'
+        }}
+      >
+        <Typography variant="h6" sx={{ mb: 2, fontWeight: 'bold' }}>
+          Pending Purchase Orders
         </Typography>
-        
         <TableContainer>
           <Table>
-            <TableHead>
+            <TableHead sx={{ backgroundColor: '#1976d2' }}>
               <TableRow>
-                <TableCell>PO Number</TableCell>
-                <TableCell>Supplier</TableCell>
-                <TableCell>Material</TableCell>
-                <TableCell>Quantity</TableCell>
-                <TableCell>Order Date</TableCell>
-                <TableCell>Deliver Date</TableCell>
-                <TableCell>Total Amount</TableCell>
-                <TableCell>Actions</TableCell>
+                {['PO Number', 'Supplier', 'Material', 'Quantity', 'Order Date', 'Deliver Date', 'Total Amount', 'Actions'].map((head, idx) => (
+                  <TableCell key={idx} sx={{ color: 'white', fontWeight: 'bold' }}>
+                    {head}
+                  </TableCell>
+                ))}
               </TableRow>
             </TableHead>
             <TableBody>
               {pendingPOs.map((po) => (
-                <TableRow key={po.id}>
+                <TableRow
+                  key={po.id}
+                  sx={{
+                    '&:hover': { backgroundColor: '#f1f8ff' },
+                    transition: '0.2s'
+                  }}
+                >
                   <TableCell>{po.poNumber}</TableCell>
                   <TableCell>{po.supplierName}</TableCell>
                   <TableCell>{po.material}</TableCell>
@@ -192,7 +219,8 @@ const ManagerDashboard = () => {
                       <Button
                         size="small"
                         startIcon={<Visibility />}
-                        onClick={() => {/* View PO details */}}
+                        sx={{ textTransform: 'none', borderRadius: 2 }}
+                        onClick={() => openViewDetails(po)}
                       >
                         View
                       </Button>
@@ -202,6 +230,7 @@ const ManagerDashboard = () => {
                         color="success"
                         startIcon={<ThumbUp />}
                         onClick={() => openApprovalDialog(po, 'Approved')}
+                        sx={{ borderRadius: 2 }}
                       >
                         Approve
                       </Button>
@@ -211,6 +240,7 @@ const ManagerDashboard = () => {
                         color="error"
                         startIcon={<ThumbDown />}
                         onClick={() => openApprovalDialog(po, 'Rejected')}
+                        sx={{ borderRadius: 2 }}
                       >
                         Reject
                       </Button>
@@ -223,26 +253,61 @@ const ManagerDashboard = () => {
         </TableContainer>
       </Paper>
 
-      {/* Approval Dialog */}
+      {/* --- View PO Dialog --- */}
+      <Dialog open={openViewDialog} onClose={() => setOpenViewDialog(false)} maxWidth="md" fullWidth>
+        <DialogTitle sx={{ fontWeight: 'bold' }}>
+          <Description sx={{ mr: 1, verticalAlign: 'middle' }} />
+          Purchase Order Details
+        </DialogTitle>
+        <DialogContent dividers>
+          {selectedPO ? (
+            <Grid container spacing={2}>
+              {[
+                { label: 'PO Number', value: selectedPO.poNumber },
+                { label: 'Supplier Name', value: selectedPO.supplierName },
+                { label: 'Material', value: selectedPO.material },
+                { label: 'Quantity', value: selectedPO.quantity },
+                { label: 'Rate Per Quantity', value: `₹${selectedPO.ratePerQuantity}` },
+                { label: 'Tax Amount', value: `₹${selectedPO.taxAmount || 0}` },
+                { label: 'Total Amount', value: `₹${((selectedPO.ratePerQuantity * selectedPO.quantity) + parseFloat(selectedPO.taxAmount || 0)).toFixed(2)}` },
+                { label: 'Order Date', value: new Date(selectedPO.orderDate).toLocaleDateString() },
+                { label: 'Deliver Date', value: new Date(selectedPO.deliverDate).toLocaleDateString() },
+                { label: 'Status', value: selectedPO.status }
+              ].map((item, idx) => (
+                <Grid item xs={12} sm={6} key={idx}>
+                  <Paper sx={{ p: 2, borderRadius: 2, boxShadow: 2 }}>
+                    <Typography variant="subtitle2" color="text.secondary">
+                      {item.label}
+                    </Typography>
+                    <Typography variant="body1" fontWeight="bold">
+                      {item.value}
+                    </Typography>
+                  </Paper>
+                </Grid>
+              ))}
+            </Grid>
+          ) : (
+            <Typography>No data available</Typography>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setOpenViewDialog(false)} sx={{ borderRadius: 2 }}>
+            Close
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* --- Approve/Reject Dialog --- */}
       <Dialog open={openPODialog} onClose={() => setOpenPODialog(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>
+        <DialogTitle sx={{ fontWeight: 'bold' }}>
           {approvalForm.status === 'Approved' ? 'Approve' : 'Reject'} Purchase Order
         </DialogTitle>
-        <DialogContent>
-          <Box sx={{ mt: 2 }}>
-            <Typography variant="body1" gutterBottom>
-              <strong>PO Number:</strong> {selectedPO?.poNumber}
-            </Typography>
-            <Typography variant="body1" gutterBottom>
-              <strong>Supplier:</strong> {selectedPO?.supplierName}
-            </Typography>
-            <Typography variant="body1" gutterBottom>
-              <strong>Material:</strong> {selectedPO?.material}
-            </Typography>
-            <Typography variant="body1" gutterBottom>
-              <strong>Quantity:</strong> {selectedPO?.quantity}
-            </Typography>
-            
+        <DialogContent dividers>
+          <Box sx={{ mt: 1 }}>
+            <Typography variant="body1"><strong>PO Number:</strong> {selectedPO?.poNumber}</Typography>
+            <Typography variant="body1"><strong>Supplier:</strong> {selectedPO?.supplierName}</Typography>
+            <Typography variant="body1"><strong>Material:</strong> {selectedPO?.material}</Typography>
+            <Typography variant="body1"><strong>Quantity:</strong> {selectedPO?.quantity}</Typography>
             <TextField
               fullWidth
               label="Remarks"
@@ -252,16 +317,18 @@ const ManagerDashboard = () => {
               multiline
               rows={3}
               required
-              helperText="Please provide remarks for your decision"
             />
           </Box>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setOpenPODialog(false)}>Cancel</Button>
-          <Button 
+          <Button onClick={() => setOpenPODialog(false)} sx={{ borderRadius: 2 }}>
+            Cancel
+          </Button>
+          <Button
             onClick={handleApproval}
             variant="contained"
             color={approvalForm.status === 'Approved' ? 'success' : 'error'}
+            sx={{ borderRadius: 2 }}
           >
             {approvalForm.status === 'Approved' ? 'Approve' : 'Reject'}
           </Button>

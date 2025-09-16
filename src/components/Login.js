@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../contexts/AuthContext';
+import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "../contexts/AuthContext";
 import {
   Container,
   Paper,
@@ -11,164 +11,226 @@ import {
   Alert,
   CircularProgress,
   InputAdornment,
-  IconButton
-} from '@mui/material';
-import { LockOutlined, Visibility, VisibilityOff } from '@mui/icons-material';
+  IconButton,
+  Avatar,
+  Grid,
+} from "@mui/material";
+import { LockOutlined, Visibility, VisibilityOff } from "@mui/icons-material";
 
 const Login = () => {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [isFirstLogin, setIsFirstLogin] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const { login } = useAuth();
   const navigate = useNavigate();
 
-  const handleClickShowPassword = () => {
-    setShowPassword(!showPassword);
-  };
-
-  const handleMouseDownPassword = (event) => {
-    event.preventDefault();
-  };
+  const handleClickShowPassword = () => setShowPassword(!showPassword);
+  const handleMouseDownPassword = (event) => event.preventDefault();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
     try {
-      setError('');
+      setError("");
       setLoading(true);
-      
-      // Check if this might be the first login
-      if (!isFirstLogin) {
-        setIsFirstLogin(true);
-      }
-      
+      if (!isFirstLogin) setIsFirstLogin(true);
+
       await login(email, password);
-      navigate('/dashboard');
+      navigate("/dashboard");
     } catch (error) {
-      console.error('Login error in component:', error);
-      
-      // Show more specific error messages
-      if (error.message.includes('Firebase configuration error')) {
-        setError('Firebase configuration error. Please check your Firebase project setup and ensure Authentication is enabled.');
-      } else if (error.message.includes('Network error')) {
-        setError('Network error. Please check your internet connection and try again.');
-      } else if (error.message.includes('Too many requests')) {
-        setError('Too many requests. Please wait a moment and try again.');
-      } else {
-        setError(error.message || 'Failed to log in. Please check your credentials.');
-      }
+      console.error("Login error in component:", error);
+      setError(
+        error.message ||
+          "Something went wrong. Please check your credentials."
+      );
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <Container component="main" maxWidth="xs">
-      <Box
-        sx={{
-          marginTop: 8,
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-        }}
-      >
+    <Box
+      sx={{
+        minHeight: "100vh",
+        background:
+          "linear-gradient(-45deg, #ff9a9e, #fad0c4, #fad0c4, #a18cd1, #fbc2eb, #84fab0, #8fd3f4)",
+        backgroundSize: "400% 400%",
+        animation: "gradientBG 15s ease infinite",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        p: 2,
+        "@keyframes gradientBG": {
+          "0%": { backgroundPosition: "0% 50%" },
+          "50%": { backgroundPosition: "100% 50%" },
+          "100%": { backgroundPosition: "0% 50%" },
+        },
+      }}
+    >
+      <Container maxWidth="md">
         <Paper
-          elevation={3}
+          elevation={8}
           sx={{
-            padding: 4,
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            width: '100%',
+            borderRadius: 5,
+            overflow: "hidden",
+            display: "flex",
+            minHeight: { xs: "auto", md: 500 },
           }}
         >
-          <LockOutlined sx={{ fontSize: 40, color: 'primary.main', mb: 2 }} />
-          <Typography component="h1" variant="h5" gutterBottom>
-            QMS Login
-          </Typography>
-          
-          {isFirstLogin && (
-            <Alert severity="info" sx={{ width: '100%', mb: 2 }}>
-              First login detected. Creating admin user...
-            </Alert>
-          )}
-          
-          {error && <Alert severity="error" sx={{ width: '100%', mb: 2 }}>{error}</Alert>}
-          
-          <Box component="form" onSubmit={handleSubmit} sx={{ width: '100%' }}>
-            <TextField
-              margin="normal"
-              required
-              fullWidth
-              id="email"
-              label="Email Address"
-              name="email"
-              autoComplete="email"
-              autoFocus
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-            />
-            <TextField
-              margin="normal"
-              required
-              fullWidth
-              name="password"
-              label="Password"
-              type={showPassword ? 'text' : 'password'}
-              id="password"
-              autoComplete="current-password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              InputProps={{
-                endAdornment: (
-                  <InputAdornment position="end">
-                    <IconButton
-                      aria-label="toggle password visibility"
-                      onClick={handleClickShowPassword}
-                      onMouseDown={handleMouseDownPassword}
-                      edge="end"
-                    >
-                      {showPassword ? <VisibilityOff /> : <Visibility />}
-                    </IconButton>
-                  </InputAdornment>
-                ),
-              }}
-            />
-            <Box sx={{ mt: 4, textAlign: 'center' }}>
+          {/* Left Side (Banner) */}
+          <Grid
+            item
+            xs={false}
+            md={6}
+            sx={{
+              display: { xs: "none", md: "flex" },
+              flexDirection: "column",
+              justifyContent: "center",
+              alignItems: "center",
+              p: 4,
+              background:
+                "linear-gradient(135deg, rgba(102,126,234,0.9), rgba(118,75,162,0.9))",
+              color: "white",
+              textAlign: "center",
+            }}
+          >
+            <Typography variant="h4" fontWeight="bold" gutterBottom>
+              Welcome to QMS 🚀
+            </Typography>
+            <Typography variant="body1" sx={{ maxWidth: 300 }}>
+              Manage your Quality Management System with ease.  
+              Sign in to access the dashboard and explore insights.
+            </Typography>
+          </Grid>
+
+          {/* Right Side (Form) */}
+          <Grid
+            item
+            xs={12}
+            md={6}
+            sx={{
+              p: 5,
+              backdropFilter: "blur(10px)",
+              flex: 1,
+              display: "flex",
+              flexDirection: "column",
+              justifyContent: "center",
+            }}
+          >
+            <Box textAlign="center" mb={3}>
+              <Avatar
+                sx={{
+                  bgcolor: "primary.main",
+                  width: 60,
+                  height: 60,
+                  margin: "0 auto",
+                  mb: 2,
+                }}
+              >
+                <LockOutlined fontSize="large" />
+              </Avatar>
+              <Typography variant="h5" fontWeight="bold">
+                Sign in to your account
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Enter your credentials to continue
+              </Typography>
+            </Box>
+
+            {isFirstLogin && (
+              <Alert severity="info" sx={{ mb: 2 }}>
+                First login detected. Creating admin user...
+              </Alert>
+            )}
+            {error && (
+              <Alert severity="error" sx={{ mb: 2 }}>
+                {error}
+              </Alert>
+            )}
+
+            <Box component="form" onSubmit={handleSubmit}>
+              <TextField
+                margin="normal"
+                required
+                fullWidth
+                label="Email Address"
+                autoComplete="email"
+                autoFocus
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                sx={{
+                  "& .MuiOutlinedInput-root": {
+                    borderRadius: 3,
+                    transition: "0.3s",
+                    "&:hover fieldset": {
+                      borderColor: "primary.main",
+                    },
+                  },
+                }}
+              />
+
+              <TextField
+                margin="normal"
+                required
+                fullWidth
+                label="Password"
+                type={showPassword ? "text" : "password"}
+                autoComplete="current-password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                InputProps={{
+                  endAdornment: (
+                    <InputAdornment position="end">
+                      <IconButton
+                        onClick={handleClickShowPassword}
+                        onMouseDown={handleMouseDownPassword}
+                        edge="end"
+                      >
+                        {showPassword ? <VisibilityOff /> : <Visibility />}
+                      </IconButton>
+                    </InputAdornment>
+                  ),
+                }}
+                sx={{
+                  "& .MuiOutlinedInput-root": {
+                    borderRadius: 3,
+                    transition: "0.3s",
+                    "&:hover fieldset": {
+                      borderColor: "primary.main",
+                    },
+                  },
+                }}
+              />
+
               <Button
                 type="submit"
                 fullWidth
                 variant="contained"
-                sx={{ mt: 3, mb: 2 }}
+                sx={{
+                  mt: 3,
+                  mb: 2,
+                  py: 1.4,
+                  fontSize: "1rem",
+                  borderRadius: 3,
+                  textTransform: "none",
+                  background:
+                    "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+                  "&:hover": {
+                    background:
+                      "linear-gradient(135deg, #5a67d8 0%, #6b46c1 100%)",
+                  },
+                }}
                 disabled={loading}
               >
-                {loading ? <CircularProgress size={24} /> : 'Sign In'}
+                {loading ? <CircularProgress size={24} /> : "Sign In"}
               </Button>
             </Box>
-            
-            {isFirstLogin && (
-              <Typography variant="body2" color="text.secondary" align="center" sx={{ mt: 2 }}>
-                This will be your admin account for the QMS system.
-              </Typography>
-            )}
-            
-            <Box sx={{ mt: 2, textAlign: 'center' }}>
-              <Button
-                variant="text"
-                size="small"
-                href="/setup"
-                sx={{ textTransform: 'none' }}
-              >
-                Check System Status
-              </Button>
-            </Box>
-          </Box>
+          </Grid>
         </Paper>
-      </Box>
-    </Container>
+      </Container>
+    </Box>
   );
 };
 

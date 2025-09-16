@@ -22,7 +22,8 @@ import {
   DialogContent,
   DialogActions,
   TextField,
-  MenuItem
+  MenuItem,
+  Chip
 } from '@mui/material';
 import {
   Security,
@@ -31,71 +32,74 @@ import {
   Logout,
   Edit
 } from '@mui/icons-material';
-import { collection, getDocs, addDoc, query, where, orderBy, updateDoc, doc, setDoc, getDoc } from 'firebase/firestore';
+import {
+  collection,
+  getDocs,
+  addDoc,
+  query,
+  orderBy,
+  updateDoc,
+  doc,
+  setDoc,
+  getDoc
+} from 'firebase/firestore';
 import { db } from '../firebase';
 import { useNavigate } from 'react-router-dom';
 
-
 const GateSecurityDashboard = () => {
   const { logout, currentUser } = useAuth();
-   const navigate = useNavigate();
+  const navigate = useNavigate();
+
   const [gateEntries, setGateEntries] = useState([]);
   const [openEntryDialog, setOpenEntryDialog] = useState(false);
+  const [viewEntry, setViewEntry] = useState(null);
   const [approvedPOs, setApprovedPOs] = useState([]);
   const [editingEntry, setEditingEntry] = useState(null);
-  const [entryForm, setEntryForm] = useState({
-    vehicleNumber: '',
-    driverName: '',
-    driverPhone: '',
-    poNumber: '',
-    supplierName: '',
-    material: '',
-    entryTime: '',
-    vehicleChecks: '',
-    remarks: ''
-  });
+const [entryForm, setEntryForm] = useState({
+  vehicleNumber: '',
+  driverName: '',
+  driverPhone: '',
+  poNumber: '',
+  supplierName: '',
+  material: '',
+  entryTime: '',
+  vehicleChecks: '',
+  remarks: '',
+  outTime: ''   // NEW FIELD
+});
+
 
   useEffect(() => {
     fetchGateEntries();
+    fetchApprovedPOs();
   }, []);
-  
-  useEffect(() => {
-  fetchGateEntries();
-  fetchApprovedPOs();
-}, []);
 
-const fetchApprovedPOs = async () => {
-  try {
-    const q = query(
-      collection(db, 'purchaseOrders'),
-    );
-    const querySnapshot = await getDocs(q);
-    const poData = querySnapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data()
-    }));
-    console.log('Approved POs:', poData); // Add this line
-    setApprovedPOs(poData);
-  } catch (error) {
-    console.error('Error fetching approved POs:', error);
-  }
-};
+  const fetchApprovedPOs = async () => {
+    try {
+      const q = query(collection(db, 'purchaseOrders'));
+      const querySnapshot = await getDocs(q);
+      const poData = querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      setApprovedPOs(poData);
+    } catch (error) {
+      console.error('Error fetching approved POs:', error);
+    }
+  };
+
   const fetchGateEntries = async () => {
     try {
-      const q = query(
-        collection(db, 'gateEntries'),
-        orderBy('createdAt', 'desc')
-      );
+      const q = query(collection(db, 'gateEntries'), orderBy('createdAt', 'desc'));
       const querySnapshot = await getDocs(q);
       const entriesData = querySnapshot.docs.map(doc => {
         const data = doc.data();
-        // Flatten vehicles for display in table
         const flattenedEntries = [];
         if (data.vehicles) {
           Object.values(data.vehicles).forEach(vehicle => {
             flattenedEntries.push({
               id: `${doc.id}_${vehicle.vehicleNumber}`,
-              poNumber: doc.id, // Document ID is now the PO number
+              poNumber: doc.id,
               supplierName: data.supplierName,
               material: data.material,
               ...vehicle
@@ -112,38 +116,37 @@ const fetchApprovedPOs = async () => {
 
   const handleLogout = async () => {
     await logout();
-    navigate('/login'); // Redirect to login page
+    navigate('/login');
   };
 
   const handleCreateEntry = async () => {
     try {
       const poDocRef = doc(db, 'gateEntries', entryForm.poNumber);
       const poDoc = await getDoc(poDocRef);
-      
-      const vehicleData = {
-        vehicleNumber: entryForm.vehicleNumber,
-        driverName: entryForm.driverName,
-        driverPhone: entryForm.driverPhone,
-        entryTime: entryForm.entryTime,
-        vehicleChecks: entryForm.vehicleChecks,
-        remarks: entryForm.remarks,
-        status: 'Active'
-      };
+
+const vehicleData = {
+  vehicleNumber: entryForm.vehicleNumber,
+  driverName: entryForm.driverName,
+  driverPhone: entryForm.driverPhone,
+  entryTime: entryForm.entryTime,
+  vehicleChecks: entryForm.vehicleChecks,
+  remarks: entryForm.remarks,
+  outTime: entryForm.outTime || null,
+  status: editingEntry ? 'Closed' : 'Active'
+};
+
 
       if (poDoc.exists()) {
-        // Update existing PO document with new vehicle
         const existingData = poDoc.data();
         const updatedVehicles = {
           ...existingData.vehicles,
           [entryForm.vehicleNumber]: vehicleData
         };
-        
         await updateDoc(poDocRef, {
           vehicles: updatedVehicles,
           updatedAt: new Date().toISOString()
         });
       } else {
-        // Create new PO document
         const entryData = {
           poNumber: entryForm.poNumber,
           supplierName: entryForm.supplierName,
@@ -155,11 +158,9 @@ const fetchApprovedPOs = async () => {
           createdAt: new Date().toISOString(),
           status: 'Active'
         };
-        
         await setDoc(poDocRef, entryData);
       }
-      
-      // Log activity
+
       await addDoc(collection(db, 'activityLogs'), {
         action: editingEntry ? 'Gate Entry Updated' : 'Gate Entry Recorded',
         userId: currentUser.uid,
@@ -203,42 +204,60 @@ const fetchApprovedPOs = async () => {
     setOpenEntryDialog(true);
   };
 
-  const openEditDialog = (entry) => {
-    setEditingEntry(entry);
-    setEntryForm({
-      vehicleNumber: entry.vehicleNumber,
-      driverName: entry.driverName,
-      driverPhone: entry.driverPhone,
-      poNumber: entry.poNumber,
-      supplierName: entry.supplierName,
-      material: entry.material,
-      entryTime: entry.entryTime,
-      vehicleChecks: entry.vehicleChecks,
-      remarks: entry.remarks
-    });
-    setOpenEntryDialog(true);
-  };
-
-  const handlePOCardClick = (po) => {
+const openEditDialog = (entry) => {
+  setEditingEntry(entry);
   setEntryForm({
-    ...entryForm,
-    poNumber: po.poNumber || '',
-    supplierName: po.supplierName || '',
-    material: po.material || '',
-    entryTime: new Date().toISOString().slice(0, 16)
+    vehicleNumber: entry.vehicleNumber,
+    driverName: entry.driverName,
+    driverPhone: entry.driverPhone,
+    poNumber: entry.poNumber,
+    supplierName: entry.supplierName,
+    material: entry.material,
+    entryTime: entry.entryTime,
+    vehicleChecks: entry.vehicleChecks,
+    remarks: entry.remarks,
+    outTime: entry.outTime || ''   // NEW
   });
   setOpenEntryDialog(true);
 };
 
+
+  const handlePOCardClick = (po) => {
+    setEntryForm({
+      ...entryForm,
+      poNumber: po.poNumber || '',
+      supplierName: po.supplierName || '',
+      material: po.material || '',
+      entryTime: new Date().toISOString().slice(0, 16)
+    });
+    setOpenEntryDialog(true);
+  };
+
   return (
-    <Container maxWidth="xl">
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-        <Typography variant="h4" component="h1">
+    <Container maxWidth="xl" sx={{ py: 4 }}>
+      {/* Header */}
+      <Box
+        sx={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          mb: 4,
+          px: 2,
+          py: 2,
+          borderRadius: 3,
+          background: 'linear-gradient(135deg, #1976d2, #42a5f5)',
+          color: 'white',
+          boxShadow: '0 6px 20px rgba(25,118,210,0.3)'
+        }}
+      >
+        <Typography variant="h4" fontWeight="bold">
           Gate Security Dashboard
         </Typography>
         <Button
-          variant="outlined"
+          variant="contained"
+          color="error"
           startIcon={<Logout />}
+          sx={{ borderRadius: 3, textTransform: 'none', px: 3 }}
           onClick={handleLogout}
         >
           Logout
@@ -248,13 +267,21 @@ const fetchApprovedPOs = async () => {
       {/* Stats Card */}
       <Grid container spacing={3} sx={{ mb: 4 }}>
         <Grid item xs={12} sm={6} md={3}>
-          <Card>
+          <Card
+            sx={{
+              borderRadius: 4,
+              boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
+              background: 'linear-gradient(145deg, #ffffff, #f9f9f9)'
+            }}
+          >
             <CardContent>
               <Box sx={{ display: 'flex', alignItems: 'center' }}>
                 <Security sx={{ fontSize: 40, color: 'primary.main', mr: 2 }} />
                 <Box>
                   <Typography variant="h4">{gateEntries.length}</Typography>
-                  <Typography variant="body2" color="text.secondary">Total Entries</Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Total Entries
+                  </Typography>
                 </Box>
               </Box>
             </CardContent>
@@ -262,79 +289,132 @@ const fetchApprovedPOs = async () => {
         </Grid>
       </Grid>
 
+      {/* Approved POs */}
+      <Typography variant="h6" sx={{ mb: 2, fontWeight: 'bold' }}>
+        Manager Approved Purchase Orders
+      </Typography>
+      <Grid container spacing={2} sx={{ mb: 4 }}>
+        {approvedPOs.length === 0 && (
+          <Grid item xs={12}>
+            <Typography color="text.secondary">No approved POs found.</Typography>
+          </Grid>
+        )}
+        {approvedPOs.map(po => (
+          <Grid item xs={12} sm={6} md={3} key={po.id}>
+            <Card
+              sx={{
+                cursor: 'pointer',
+                borderRadius: 3,
+                transition: '0.2s',
+                '&:hover': { boxShadow: '0 6px 20px rgba(0,0,0,0.15)' }
+              }}
+              onClick={() => handlePOCardClick(po)}
+            >
+              <CardContent>
+                <Typography variant="h6" fontWeight="bold">
+                  PO: {po.poNumber}
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Supplier: {po.supplierName}
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Material: {po.material}
+                </Typography>
+              </CardContent>
+            </Card>
+          </Grid>
+        ))}
+      </Grid>
+
       {/* Gate Entries */}
-      <Paper sx={{ p: 3 }}>
+      <Paper
+        sx={{
+          p: 3,
+          borderRadius: 4,
+          boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
+          background: 'linear-gradient(145deg, #ffffff, #f9f9f9)'
+        }}
+      >
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-          <Typography variant="h6">Gate Entries</Typography>
+          <Typography variant="h6" fontWeight="bold">
+            Gate Entries
+          </Typography>
           <Button
             variant="contained"
             startIcon={<Add />}
+            sx={{ borderRadius: 3, textTransform: 'none', px: 3 }}
             onClick={openCreateDialog}
           >
             Record Entry
           </Button>
         </Box>
 
-        <Typography variant="h6" sx={{ mb: 2 }}>Manager Approved Purchase Orders</Typography>
-<Grid container spacing={2} sx={{ mb: 4 }}>
-  {approvedPOs.length === 0 && (
-    <Grid item xs={12}>
-      <Typography color="text.secondary">No approved POs found.</Typography>
-    </Grid>
-  )}
-  {approvedPOs.map(po => (
-    <Grid item xs={12} sm={6} md={3} key={po.id}>
-      <Card
-        sx={{ cursor: 'pointer', border: '2px solid #1976d2' }}
-        onClick={() => handlePOCardClick(po)}
-      >
-        <CardContent>
-          <Typography variant="h6">PO: {po.poNumber}</Typography>
-          <Typography variant="body2">Supplier: {po.supplierName}</Typography>
-          <Typography variant="body2">Material: {po.material}</Typography>
-        </CardContent>
-      </Card>
-    </Grid>
-  ))}
-</Grid>
-        
-        <TableContainer>
+        <TableContainer
+          sx={{
+            borderRadius: 3,
+            overflow: 'hidden',
+            boxShadow: '0 3px 12px rgba(0,0,0,0.1)'
+          }}
+        >
           <Table>
-            <TableHead>
+            <TableHead sx={{ backgroundColor: '#f1f5f9' }}>
               <TableRow>
-                <TableCell>Vehicle Number</TableCell>
-                <TableCell>Driver Name</TableCell>
-                <TableCell>PO Number</TableCell>
-                <TableCell>Supplier</TableCell>
-                <TableCell>Material</TableCell>
-                <TableCell>Entry Time</TableCell>
-                <TableCell>Vehicle Checks</TableCell>
-                <TableCell>Actions</TableCell>
+                <TableCell sx={{ fontWeight: 700 }}>Vehicle Number</TableCell>
+                <TableCell sx={{ fontWeight: 700 }}>Driver Name</TableCell>
+                <TableCell sx={{ fontWeight: 700 }}>PO Number</TableCell>
+                <TableCell sx={{ fontWeight: 700 }}>Supplier</TableCell>
+                <TableCell sx={{ fontWeight: 700 }}>Material</TableCell>
+                <TableCell sx={{ fontWeight: 700 }}>Entry Time</TableCell>
+                <TableCell sx={{ fontWeight: 700 }}>Out Time</TableCell>
+                <TableCell sx={{ fontWeight: 700 }}>Vehicle Checks</TableCell>
+                <TableCell sx={{ fontWeight: 700 }}>Actions</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
               {gateEntries.map((entry) => (
-                <TableRow key={entry.id}>
+                <TableRow
+                  key={entry.id}
+                  hover
+                  sx={{ transition: 'all 0.2s', '&:hover': { backgroundColor: '#f9fafb' } }}
+                >
                   <TableCell>{entry.vehicleNumber}</TableCell>
                   <TableCell>{entry.driverName}</TableCell>
                   <TableCell>{entry.poNumber}</TableCell>
                   <TableCell>{entry.supplierName}</TableCell>
                   <TableCell>{entry.material}</TableCell>
                   <TableCell>{new Date(entry.entryTime).toLocaleString()}</TableCell>
-                  <TableCell>{entry.vehicleChecks}</TableCell>
+                  <TableCell>{entry.outTime ? new Date(entry.outTime).toLocaleString() : '-'}</TableCell>
+                  <TableCell>
+                    <Chip
+                      label={entry.vehicleChecks}
+                      color={
+                        entry.vehicleChecks === 'Passed'
+                          ? 'success'
+                          : entry.vehicleChecks === 'Failed'
+                          ? 'error'
+                          : 'warning'
+                      }
+                      size="small"
+                      sx={{ fontWeight: 600 }}
+                    />
+                  </TableCell>
                   <TableCell>
                     <Box sx={{ display: 'flex', gap: 1 }}>
+<Button
+  size="small"
+  startIcon={<Visibility />}
+  variant="outlined"
+  sx={{ borderRadius: 3, textTransform: 'none', px: 2 }}
+  onClick={() => setViewEntry(entry)}
+>
+  View
+</Button>
+
                       <Button
                         size="small"
-                        startIcon={<Visibility />}
-                        onClick={() => {/* View entry details */}}
-                      >
-                        View
-                      </Button>
-                      <Button
-                        size="small"
-                        variant="outlined"
+                        variant="contained"
                         startIcon={<Edit />}
+                        sx={{ borderRadius: 3, textTransform: 'none', px: 2 }}
                         onClick={() => openEditDialog(entry)}
                       >
                         Edit
@@ -348,11 +428,28 @@ const fetchApprovedPOs = async () => {
         </TableContainer>
       </Paper>
 
-      {/* Create Entry Dialog */}
-      <Dialog open={openEntryDialog} onClose={() => setOpenEntryDialog(false)} maxWidth="md" fullWidth>
-        <DialogTitle>{editingEntry ? 'Edit Gate Entry' : 'Record Gate Entry'}</DialogTitle>
-        <DialogContent>
-          <Grid container spacing={2} sx={{ mt: 1 }}>
+      {/* Create/Edit Entry Dialog */}
+      <Dialog
+        open={openEntryDialog}
+        onClose={() => setOpenEntryDialog(false)}
+        maxWidth="md"
+        fullWidth
+        PaperProps={{
+          sx: {
+            borderRadius: 3,
+            p: 2,
+            background: 'linear-gradient(145deg, #ffffff, #f8f9fa)',
+            boxShadow: '0 8px 30px rgba(0,0,0,0.15)'
+          }
+        }}
+      >
+        <DialogTitle
+          sx={{ fontWeight: 700, fontSize: '1.25rem', color: 'primary.main' }}
+        >
+          {editingEntry ? 'Edit Gate Entry' : 'Record Gate Entry'}
+        </DialogTitle>
+        <DialogContent dividers sx={{ mt: 2 }}>
+          <Grid container spacing={2}>
             <Grid item xs={12} sm={6}>
               <TextField
                 fullWidth
@@ -441,21 +538,35 @@ const fetchApprovedPOs = async () => {
                 required
               />
             </Grid>
-            <Grid item xs={12} sm={6}>
-              <TextField
-                fullWidth
-                select
-                label="Vehicle Checks"
-                value={entryForm.vehicleChecks}
-                onChange={(e) => setEntryForm({ ...entryForm, vehicleChecks: e.target.value })}
-                margin="normal"
-                required
-              >
-                <MenuItem value="Passed">Passed</MenuItem>
-                <MenuItem value="Failed">Failed</MenuItem>
-                <MenuItem value="Pending">Pending</MenuItem>
-              </TextField>
-            </Grid>
+<Grid item xs={12} sm={6}>
+  {editingEntry ? (
+    <TextField
+      fullWidth
+      label="Out Time"
+      type="datetime-local"
+      value={entryForm.outTime}
+      onChange={(e) => setEntryForm({ ...entryForm, outTime: e.target.value })}
+      margin="normal"
+      InputLabelProps={{ shrink: true }}
+      required
+    />
+  ) : (
+    <TextField
+      fullWidth
+      select
+      label="Vehicle Checks"
+      value={entryForm.vehicleChecks}
+      onChange={(e) => setEntryForm({ ...entryForm, vehicleChecks: e.target.value })}
+      margin="normal"
+      required
+    >
+      <MenuItem value="Passed">Passed</MenuItem>
+      <MenuItem value="Failed">Failed</MenuItem>
+      <MenuItem value="Pending">Pending</MenuItem>
+    </TextField>
+  )}
+</Grid>
+
             <Grid item xs={12}>
               <TextField
                 fullWidth
@@ -470,12 +581,80 @@ const fetchApprovedPOs = async () => {
           </Grid>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setOpenEntryDialog(false)}>Cancel</Button>
-          <Button onClick={handleCreateEntry} variant="contained">
+          <Button
+            onClick={() => setOpenEntryDialog(false)}
+            sx={{ borderRadius: 3, px: 3, textTransform: 'none' }}
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={handleCreateEntry}
+            variant="contained"
+            sx={{ borderRadius: 3, px: 3, textTransform: 'none' }}
+          >
             {editingEntry ? 'Update Entry' : 'Record Entry'}
           </Button>
         </DialogActions>
       </Dialog>
+      {/* View Entry Dialog */}
+<Dialog
+  open={!!viewEntry}
+  onClose={() => setViewEntry(null)}
+  maxWidth="md"
+  fullWidth
+  PaperProps={{
+    sx: {
+      borderRadius: 3,
+      p: 2,
+      background: 'linear-gradient(145deg, #ffffff, #f8f9fa)',
+      boxShadow: '0 8px 30px rgba(0,0,0,0.15)'
+    }
+  }}
+>
+  <DialogTitle
+    sx={{ fontWeight: 700, fontSize: '1.25rem', color: 'primary.main' }}
+  >
+    Gate Entry Details
+  </DialogTitle>
+  <DialogContent dividers sx={{ mt: 2 }}>
+    {viewEntry && (
+      <Grid container spacing={2}>
+        {[
+          ["Vehicle Number", viewEntry.vehicleNumber],
+          ["Driver Name", viewEntry.driverName],
+          ["Driver Phone", viewEntry.driverPhone],
+          ["PO Number", viewEntry.poNumber],
+          ["Supplier", viewEntry.supplierName],
+          ["Material", viewEntry.material],
+["Entry Time", new Date(viewEntry.entryTime).toLocaleString()],
+["Out Time", viewEntry.outTime ? new Date(viewEntry.outTime).toLocaleString() : "-"],
+["Vehicle Checks", viewEntry.vehicleChecks],
+
+          ["Remarks", viewEntry.remarks],
+          ["Status", viewEntry.status],
+        ].map(([label, value]) => (
+          <Grid item xs={12} sm={6} key={label}>
+            <Paper sx={{ p: 2, borderRadius: 2, boxShadow: 2 }}>
+              <Typography variant="subtitle2" color="text.secondary">
+                {label}
+              </Typography>
+              <Typography variant="body1">{value || "-"}</Typography>
+            </Paper>
+          </Grid>
+        ))}
+      </Grid>
+    )}
+  </DialogContent>
+  <DialogActions>
+    <Button
+      onClick={() => setViewEntry(null)}
+      sx={{ borderRadius: 3, px: 3, textTransform: 'none' }}
+    >
+      Close
+    </Button>
+  </DialogActions>
+</Dialog>
+
     </Container>
   );
 };

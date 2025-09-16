@@ -40,6 +40,9 @@ const QCDashboard = () => {
   const navigate = useNavigate();
   const [qcResults, setQcResults] = useState([]);
   const [openQCDialog, setOpenQCDialog] = useState(false);
+  const [openViewDialog, setOpenViewDialog] = useState(false);
+const [selectedQC, setSelectedQC] = useState(null);
+const [poList, setPoList] = useState([]);
   const [editingQC, setEditingQC] = useState(null);
   const [qcForm, setQcForm] = useState({
     poNumber: '',
@@ -60,6 +63,25 @@ const QCDashboard = () => {
     await logout();
     navigate('/login'); // Redirect to login page
   };
+  const fetchPOs = async () => {
+  try {
+    const q = query(collection(db, "purchaseOrders"), orderBy("createdAt", "desc"));
+    const querySnapshot = await getDocs(q);
+    const poData = querySnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    }));
+    setPoList(poData);
+  } catch (error) {
+    console.error("Error fetching POs:", error);
+  }
+};
+
+useEffect(() => {
+  fetchQCResults();
+  fetchPOs();
+}, []);
+
 
   const fetchQCResults = async () => {
     try {
@@ -173,244 +195,416 @@ const QCDashboard = () => {
   };
 
   return (
-    <Container maxWidth="xl">
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-        <Typography variant="h4" component="h1">
-          QC Department Dashboard
-        </Typography>
-        <Button
-          variant="outlined"
-          startIcon={<Logout />}
-          onClick={handleLogout}
-        >
-          Logout
-        </Button>
-      </Box>
+<Container maxWidth="xl" sx={{ py: 4 }}>
+  {/* Dashboard Header */}
+  <Box
+    sx={{
+      display: 'flex',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      mb: 4,
+      p: 3,
+      borderRadius: 3,
+      background: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
+      color: '#fff',
+      boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
+    }}
+  >
+    <Typography variant="h4" component="h1" sx={{ fontWeight: 700 }}>
+      QC Department Dashboard
+    </Typography>
+    <Button
+      variant="contained"
+      startIcon={<Logout />}
+      onClick={handleLogout}
+      sx={{
+        bgcolor: 'rgba(255,255,255,0.2)',
+        backdropFilter: 'blur(10px)',
+        color: '#fff',
+        px: 3,
+        borderRadius: 2,
+        '&:hover': {
+          bgcolor: 'rgba(255,255,255,0.3)',
+        },
+      }}
+    >
+      Logout
+    </Button>
+  </Box>
 
-      {/* Stats Card */}
-      <Grid container spacing={3} sx={{ mb: 4 }}>
-        <Grid item xs={12} sm={6} md={3}>
-          <Card>
-            <CardContent>
-              <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                <CheckCircle sx={{ fontSize: 40, color: 'success.main', mr: 2 }} />
-                <Box>
-                  <Typography variant="h4">{qcResults.length}</Typography>
-                  <Typography variant="body2" color="text.secondary">QC Tests</Typography>
+  {/* Stats Card */}
+  <Grid container spacing={3} sx={{ mb: 4 }}>
+    <Grid item xs={12} sm={6} md={3}>
+      <Card
+        sx={{
+          borderRadius: 3,
+          p: 2,
+          backdropFilter: 'blur(12px)',
+          boxShadow: '0 6px 20px rgba(0,0,0,0.1)',
+          transition: '0.3s',
+          '&:hover': { transform: 'translateY(-5px)', boxShadow: '0 12px 30px rgba(0,0,0,0.2)' },
+        }}
+      >
+        <CardContent sx={{ display: 'flex', alignItems: 'center' }}>
+          <CheckCircle sx={{ fontSize: 50, color: 'success.main', mr: 2 }} />
+          <Box>
+            <Typography variant="h4" sx={{ fontWeight: 700 }}>
+              {qcResults.length}
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              QC Tests
+            </Typography>
+          </Box>
+        </CardContent>
+      </Card>
+    </Grid>
+  </Grid>
+
+  {/* QC Results */}
+  <Paper
+    sx={{
+      p: 3,
+      borderRadius: 3,
+      boxShadow: '0 6px 20px rgba(0,0,0,0.08)',
+      background: '#fff',
+    }}
+  >
+    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+      <Typography variant="h6" sx={{ fontWeight: 600 }}>
+        Quality Control Results
+      </Typography>
+      <Button
+        variant="contained"
+        startIcon={<Add />}
+        onClick={openCreateDialog}
+        sx={{
+          borderRadius: 2,
+          px: 3,
+          textTransform: 'none',
+          boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+        }}
+      >
+        Record QC Result
+      </Button>
+    </Box>
+
+    <TableContainer>
+      <Table sx={{ borderRadius: 3, overflow: 'hidden' }}>
+<TableHead>
+  <TableRow sx={{ background: '#f5f7fa' }}>
+    {['PO Number', 'Material', 'Supplier', 'Test Date', 'Test Result', 'Purity (%)', 'Moisture (%)', 'Weight/Quantity', 'Actions'].map((header) => (
+      <TableCell key={header} sx={{ fontWeight: 600 }}>
+        {header}
+      </TableCell>
+    ))}
+  </TableRow>
+</TableHead>
+
+        <TableBody>
+          {qcResults.map((qc, index) => (
+            <TableRow
+              key={qc.id}
+              sx={{
+                backgroundColor: index % 2 === 0 ? '#fff' : '#fafafa',
+                '&:hover': { backgroundColor: '#f1f9ff' },
+              }}
+            >
+              <TableCell>{qc.poNumber}</TableCell>
+              <TableCell>{qc.material}</TableCell>
+              <TableCell>{qc.supplierName}</TableCell>
+              <TableCell>{new Date(qc.testDate).toLocaleDateString()}</TableCell>
+              <TableCell>
+                <Typography variant="body2" sx={{ color: getResultColor(qc.testResult), fontWeight: 600 }}>
+                  {qc.testResult}
+                </Typography>
+              </TableCell>
+              <TableCell>{qc.purity || 'N/A'}</TableCell>
+              <TableCell>{qc.moisture || 'N/A'}</TableCell>
+<TableCell>
+  {qc.weight ? `${qc.weight} kg` : qc.quantity ? qc.quantity : 'N/A'}
+</TableCell>
+
+              <TableCell>
+                <Box sx={{ display: 'flex', gap: 1 }}>
+<Button
+  size="small"
+  startIcon={<Visibility />}
+  sx={{ textTransform: 'none' }}
+  onClick={() => {
+    setSelectedQC(qc);
+    setOpenViewDialog(true);
+  }}
+>
+  View
+</Button>
+
+                  <Button size="small" variant="outlined" startIcon={<Edit />} sx={{ textTransform: 'none' }} onClick={() => openEditDialog(qc)}>
+                    Edit
+                  </Button>
                 </Box>
-              </Box>
-            </CardContent>
-          </Card>
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </TableContainer>
+  </Paper>
+
+  {/* Dialog: styled below */}
+  <Dialog
+    open={openQCDialog}
+    onClose={() => setOpenQCDialog(false)}
+    maxWidth="md"
+    fullWidth
+    PaperProps={{
+      sx: { borderRadius: 3, p: 1, boxShadow: '0 8px 24px rgba(0,0,0,0.15)' },
+    }}
+  >
+    <DialogTitle sx={{ fontWeight: 700, pb: 1, fontSize: '1.3rem' }}>
+      {editingQC ? 'Edit QC Test Result' : 'Record QC Test Result'}
+    </DialogTitle>
+<DialogContent dividers sx={{ p: 3 }}>
+  <Grid container spacing={2}>
+<Grid item xs={12} sm={6}>
+  <TextField
+    select
+    label="PO Number"
+    fullWidth
+    value={qcForm.poNumber}
+    onChange={(e) => setQcForm({ ...qcForm, poNumber: e.target.value })}
+  >
+    {poList.length > 0 ? (
+      poList.map((po) => (
+        <MenuItem key={po.id} value={po.poNumber}>
+          {po.poNumber} - {po.supplierName}
+        </MenuItem>
+      ))
+    ) : (
+      <MenuItem disabled>No POs Available</MenuItem>
+    )}
+  </TextField>
+</Grid>
+
+    <Grid item xs={12} sm={6}>
+      <TextField
+        label="Material"
+        fullWidth
+        value={qcForm.material}
+        onChange={(e) => setQcForm({ ...qcForm, material: e.target.value })}
+      />
+    </Grid>
+    <Grid item xs={12} sm={6}>
+      <TextField
+        label="Supplier Name"
+        fullWidth
+        value={qcForm.supplierName}
+        onChange={(e) => setQcForm({ ...qcForm, supplierName: e.target.value })}
+      />
+    </Grid>
+    <Grid item xs={12} sm={6}>
+      <TextField
+        label="Test Date"
+        type="date"
+        fullWidth
+        InputLabelProps={{ shrink: true }}
+        value={qcForm.testDate}
+        onChange={(e) => setQcForm({ ...qcForm, testDate: e.target.value })}
+      />
+    </Grid>
+    <Grid item xs={12} sm={6}>
+      <TextField
+        select
+        label="Test Result"
+        fullWidth
+        value={qcForm.testResult}
+        onChange={(e) => setQcForm({ ...qcForm, testResult: e.target.value })}
+      >
+        <MenuItem value="Pending">Pending</MenuItem>
+        <MenuItem value="Passed">Passed</MenuItem>
+        <MenuItem value="Failed">Failed</MenuItem>
+      </TextField>
+    </Grid>
+    <Grid item xs={12} sm={6}>
+      <TextField
+        select
+        fullWidth
+        label="Select Option"
+        value={qcForm.option || ""}
+        onChange={(e) => setQcForm({ ...qcForm, option: e.target.value })}
+      >
+        <MenuItem value="weight">Weight in KG</MenuItem>
+        <MenuItem value="quantity">Quantity</MenuItem>
+        <MenuItem value="none">None</MenuItem>
+      </TextField>
+    </Grid>
+
+    {/* Weight Field */}
+    <Grid item xs={12} sm={6}>
+      <TextField
+        fullWidth
+        label="Weight (kg)"
+        type="number"
+        value={qcForm.weight || ""}
+        onChange={(e) => setQcForm({ ...qcForm, weight: e.target.value })}
+        disabled={qcForm.option !== "weight"}
+      />
+    </Grid>
+
+    {/* Quantity Field */}
+    <Grid item xs={12} sm={6}>
+      <TextField
+        fullWidth
+        label="Quantity"
+        type="number"
+        value={qcForm.quantity || ""}
+        onChange={(e) => setQcForm({ ...qcForm, quantity: e.target.value })}
+        disabled={qcForm.option !== "quantity"}
+      />
+    </Grid>
+
+    <Grid item xs={12} sm={6}>
+      <TextField
+        label="Purity (%)"
+        fullWidth
+        value={qcForm.purity}
+        onChange={(e) => setQcForm({ ...qcForm, purity: e.target.value })}
+      />
+    </Grid>
+    
+    <Grid item xs={12} sm={6}>
+      <TextField
+        label="Moisture (%)"
+        fullWidth
+        value={qcForm.moisture}
+        onChange={(e) => setQcForm({ ...qcForm, moisture: e.target.value })}
+      />
+    </Grid>
+
+    <Grid item xs={12}>
+      <TextField
+        label="Remarks"
+        fullWidth
+        multiline
+        rows={2}
+        value={qcForm.remarks}
+        onChange={(e) =>
+          setQcForm({ ...qcForm, remarks: e.target.value })
+        }
+      />
+    </Grid>
+  </Grid>
+  
+</DialogContent>
+
+    <DialogActions sx={{ px: 3, pb: 2 }}>
+      <Button onClick={() => setOpenQCDialog(false)} sx={{ textTransform: 'none' }}>
+        Cancel
+      </Button>
+      <Button onClick={handleCreateQCResult} variant="contained" sx={{ borderRadius: 2, px: 3, textTransform: 'none' }}>
+        {editingQC ? 'Update Result' : 'Record Result'}
+      </Button>
+    </DialogActions>
+  </Dialog>
+  {/* View QC Details Dialog */}
+<Dialog
+  open={openViewDialog}
+  onClose={() => setOpenViewDialog(false)}
+  maxWidth="sm"
+  fullWidth
+  PaperProps={{
+    sx: { borderRadius: 3, p: 2, boxShadow: '0 8px 24px rgba(0,0,0,0.15)' },
+  }}
+>
+  <DialogTitle sx={{ fontWeight: 700, fontSize: '1.3rem' }}>
+    QC Test Details
+  </DialogTitle>
+  <DialogContent dividers sx={{ p: 3 }}>
+    {selectedQC && (
+      <Grid container spacing={2}>
+        <Grid item xs={6}>
+          <Typography variant="subtitle2" color="text.secondary">
+            PO Number
+          </Typography>
+          <Typography variant="body1" sx={{ fontWeight: 600 }}>
+            {selectedQC.poNumber}
+          </Typography>
+        </Grid>
+        <Grid item xs={6}>
+          <Typography variant="subtitle2" color="text.secondary">
+            Supplier
+          </Typography>
+          <Typography variant="body1" sx={{ fontWeight: 600 }}>
+            {selectedQC.supplierName}
+          </Typography>
+        </Grid>
+        <Grid item xs={6}>
+          <Typography variant="subtitle2" color="text.secondary">
+            Material
+          </Typography>
+          <Typography variant="body1">{selectedQC.material}</Typography>
+        </Grid>
+        <Grid item xs={6}>
+          <Typography variant="subtitle2" color="text.secondary">
+            Test Date
+          </Typography>
+          <Typography variant="body1">
+            {new Date(selectedQC.testDate).toLocaleDateString()}
+          </Typography>
+        </Grid>
+        <Grid item xs={6}>
+          <Typography variant="subtitle2" color="text.secondary">
+            Result
+          </Typography>
+          <Typography
+            variant="body1"
+            sx={{ color: getResultColor(selectedQC.testResult), fontWeight: 600 }}
+          >
+            {selectedQC.testResult}
+          </Typography>
+        </Grid>
+        <Grid item xs={6}>
+          <Typography variant="subtitle2" color="text.secondary">
+            Purity (%)
+          </Typography>
+          <Typography variant="body1">{selectedQC.purity || 'N/A'}</Typography>
+        </Grid>
+        <Grid item xs={6}>
+          <Typography variant="subtitle2" color="text.secondary">
+            Moisture (%)
+          </Typography>
+          <Typography variant="body1">{selectedQC.moisture || 'N/A'}</Typography>
+        </Grid>
+        <Grid item xs={12}>
+          <Typography variant="subtitle2" color="text.secondary">
+            Other Test Parameters
+          </Typography>
+          <Typography variant="body1">
+            {selectedQC.testParameters || 'N/A'}
+          </Typography>
+        </Grid>
+        <Grid item xs={12}>
+          <Typography variant="subtitle2" color="text.secondary">
+            Remarks
+          </Typography>
+          <Typography variant="body1">
+            {selectedQC.remarks || 'N/A'}
+          </Typography>
         </Grid>
       </Grid>
+    )}
+  </DialogContent>
+  <DialogActions>
+    <Button
+      onClick={() => setOpenViewDialog(false)}
+      sx={{ textTransform: 'none' }}
+    >
+      Close
+    </Button>
+  </DialogActions>
+</Dialog>
 
-      {/* QC Results */}
-      <Paper sx={{ p: 3 }}>
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-          <Typography variant="h6">Quality Control Results</Typography>
-          <Button
-            variant="contained"
-            startIcon={<Add />}
-            onClick={openCreateDialog}
-          >
-            Record QC Result
-          </Button>
-        </Box>
-        
-        <TableContainer>
-          <Table>
-            <TableHead>
-              <TableRow>
-                <TableCell>PO Number</TableCell>
-                <TableCell>Material</TableCell>
-                <TableCell>Supplier</TableCell>
-                <TableCell>Test Date</TableCell>
-                <TableCell>Test Result</TableCell>
-                <TableCell>Purity (%)</TableCell>
-                <TableCell>Moisture (%)</TableCell>
-                <TableCell>Other Parameters</TableCell>
-                <TableCell>Actions</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {qcResults.map((qc) => (
-                <TableRow key={qc.id}>
-                  <TableCell>{qc.poNumber}</TableCell>
-                  <TableCell>{qc.material}</TableCell>
-                  <TableCell>{qc.supplierName}</TableCell>
-                  <TableCell>{new Date(qc.testDate).toLocaleDateString()}</TableCell>
-                  <TableCell>
-                    <Typography
-                      variant="body2"
-                      sx={{ color: getResultColor(qc.testResult) }}
-                    >
-                      {qc.testResult}
-                    </Typography>
-                  </TableCell>
-                  <TableCell>{qc.purity || 'N/A'}</TableCell>
-                  <TableCell>{qc.moisture || 'N/A'}</TableCell>
-                  <TableCell>{qc.testParameters || 'N/A'}</TableCell>
-                  <TableCell>
-                    <Box sx={{ display: 'flex', gap: 1 }}>
-                      <Button
-                        size="small"
-                        startIcon={<Visibility />}
-                        onClick={() => {/* View QC details */}}
-                      >
-                        View
-                      </Button>
-                      <Button
-                        size="small"
-                        variant="outlined"
-                        startIcon={<Edit />}
-                        onClick={() => openEditDialog(qc)}
-                      >
-                        Edit
-                      </Button>
-                    </Box>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </TableContainer>
-      </Paper>
+</Container>
 
-      {/* Create QC Result Dialog */}
-      <Dialog open={openQCDialog} onClose={() => setOpenQCDialog(false)} maxWidth="md" fullWidth>
-        <DialogTitle>{editingQC ? 'Edit QC Test Result' : 'Record QC Test Result'}</DialogTitle>
-        <DialogContent>
-          <Grid container spacing={2} sx={{ mt: 1 }}>
-            <Grid item xs={12} sm={6}>
-              <POSelector
-                value={qcForm.poNumber ? { poNumber: qcForm.poNumber } : null}
-                onChange={(selectedPO) => {
-                  if (selectedPO) {
-                    setQcForm({
-                      ...qcForm,
-                      poNumber: selectedPO.poNumber,
-                      supplierName: selectedPO.supplierName,
-                      material: selectedPO.material
-                    });
-                  } else {
-                    setQcForm({
-                      ...qcForm,
-                      poNumber: '',
-                      supplierName: '',
-                      material: ''
-                    });
-                  }
-                }}
-                label="PO Number"
-                required
-                showDetails={true}
-                placeholder="Search PO number..."
-              />
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <TextField
-                fullWidth
-                label="Material"
-                value={qcForm.material}
-                onChange={(e) => setQcForm({ ...qcForm, material: e.target.value })}
-                margin="normal"
-                required
-              />
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <TextField
-                fullWidth
-                label="Supplier Name"
-                value={qcForm.supplierName}
-                onChange={(e) => setQcForm({ ...qcForm, supplierName: e.target.value })}
-                margin="normal"
-                required
-              />
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <TextField
-                fullWidth
-                label="Test Date"
-                type="date"
-                value={qcForm.testDate}
-                onChange={(e) => setQcForm({ ...qcForm, testDate: e.target.value })}
-                margin="normal"
-                InputLabelProps={{ shrink: true }}
-                required
-              />
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <TextField
-                fullWidth
-                select
-                label="Test Result"
-                value={qcForm.testResult}
-                onChange={(e) => setQcForm({ ...qcForm, testResult: e.target.value })}
-                margin="normal"
-                required
-              >
-                <MenuItem value="Passed">Passed</MenuItem>
-                <MenuItem value="Failed">Failed</MenuItem>
-                <MenuItem value="Pending">Pending</MenuItem>
-              </TextField>
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <TextField
-                fullWidth
-                label="Purity (%)"
-                type="number"
-                value={qcForm.purity}
-                onChange={(e) => setQcForm({ ...qcForm, purity: e.target.value })}
-                margin="normal"
-                required
-                inputProps={{ min: 0, max: 100, step: 0.01 }}
-                placeholder="e.g., 99.5"
-              />
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <TextField
-                fullWidth
-                label="Moisture (%)"
-                type="number"
-                value={qcForm.moisture}
-                onChange={(e) => setQcForm({ ...qcForm, moisture: e.target.value })}
-                margin="normal"
-                required
-                inputProps={{ min: 0, max: 100, step: 0.01 }}
-                placeholder="e.g., 0.1"
-              />
-            </Grid>
-            <Grid item xs={12}>
-              <TextField
-                fullWidth
-                label="Other Test Parameters"
-                value={qcForm.testParameters}
-                onChange={(e) => setQcForm({ ...qcForm, testParameters: e.target.value })}
-                margin="normal"
-                placeholder="Additional test parameters or notes"
-              />
-            </Grid>
-            <Grid item xs={12}>
-              <TextField
-                fullWidth
-                label="Remarks"
-                value={qcForm.remarks}
-                onChange={(e) => setQcForm({ ...qcForm, remarks: e.target.value })}
-                margin="normal"
-                multiline
-                rows={3}
-              />
-            </Grid>
-          </Grid>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setOpenQCDialog(false)}>Cancel</Button>
-          <Button onClick={handleCreateQCResult} variant="contained">
-            {editingQC ? 'Update Result' : 'Record Result'}
-          </Button>
-        </DialogActions>
-      </Dialog>
-    </Container>
   );
 };
 

@@ -24,12 +24,7 @@ import {
   TextField,
   MenuItem
 } from '@mui/material';
-import {
-  Unarchive,
-  Add,
-  Visibility,
-  Logout
-} from '@mui/icons-material';
+import { Unarchive, Add, Visibility, Logout } from '@mui/icons-material';
 import { collection, getDocs, addDoc, query, orderBy } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useNavigate } from 'react-router-dom';
@@ -39,8 +34,12 @@ const UnloadingDashboard = () => {
   const { getGateEntriesByPO } = usePO();
   const navigate = useNavigate();
   const [unloadingRecords, setUnloadingRecords] = useState([]);
+  const [selectedRecord, setSelectedRecord] = useState(null);
+const [openViewDialog, setOpenViewDialog] = useState(false);
   const [openUnloadingDialog, setOpenUnloadingDialog] = useState(false);
   const [availableVehicles, setAvailableVehicles] = useState([]);
+  const [openEditDialog, setOpenEditDialog] = useState(false);
+const [editingRecord, setEditingRecord] = useState(null);
   const [unloadingForm, setUnloadingForm] = useState({
     vehicleNumber: '',
     poNumber: '',
@@ -56,10 +55,61 @@ const UnloadingDashboard = () => {
   useEffect(() => {
     fetchUnloadingRecords();
   }, []);
+
   const handleLogout = async () => {
     await logout();
-    navigate('/login'); // Redirect to login page
+    navigate('/login');
   };
+
+  const handleViewRecord = (record) => {
+  setSelectedRecord(record);
+  setOpenViewDialog(true);
+};
+
+const handleEditRecord = (record) => {
+  setEditingRecord(record);
+  setUnloadingForm({
+    vehicleNumber: record.vehicleNumber,
+    poNumber: record.poNumber,
+    material: record.material,
+    supplierName: record.supplierName,
+    unloadingStartTime: record.unloadingStartTime,
+    unloadingEndTime: record.unloadingEndTime,
+    storageLocation: record.storageLocation,
+    quantityUnloaded: record.quantityUnloaded,
+    remarks: record.remarks || ''
+  });
+  setOpenEditDialog(true);
+};
+
+// Update record in Firestore
+const handleUpdateUnloadingRecord = async () => {
+  try {
+    const recordRef = collection(db, 'unloading');
+    const recordDoc = unloadingRecords.find(r => r.id === editingRecord.id);
+    if (!recordDoc) return;
+
+    await db.doc(`unloading/${editingRecord.id}`).update({
+      ...unloadingForm,
+      updatedAt: new Date().toISOString()
+    });
+
+    // Optional: add activity log
+    await addDoc(collection(db, 'activityLogs'), {
+      action: 'Unloading Record Updated',
+      userId: currentUser.uid,
+      userRole: 'Unloading Dept',
+      details: `Updated unloading record for vehicle ${unloadingForm.vehicleNumber}`,
+      timestamp: new Date().toISOString()
+    });
+
+    setOpenEditDialog(false);
+    setEditingRecord(null);
+    fetchUnloadingRecords();
+  } catch (error) {
+    console.error('Error updating record:', error);
+  }
+};
 
   const fetchUnloadingRecords = async () => {
     try {
@@ -89,7 +139,6 @@ const UnloadingDashboard = () => {
 
       await addDoc(collection(db, 'unloading'), unloadingData);
       
-      // Log activity
       await addDoc(collection(db, 'activityLogs'), {
         action: 'Unloading Completed',
         userId: currentUser.uid,
@@ -121,7 +170,6 @@ const UnloadingDashboard = () => {
       const gateEntries = await getGateEntriesByPO(poNumber);
       setAvailableVehicles(gateEntries);
       
-      // Automatically select the first available vehicle if only one is found
       if (gateEntries.length === 1) {
         setUnloadingForm(prev => ({
           ...prev,
@@ -141,9 +189,8 @@ const UnloadingDashboard = () => {
         poNumber: selectedPO.poNumber,
         supplierName: selectedPO.supplierName,
         material: selectedPO.material,
-        vehicleNumber: '' // Reset vehicle number when PO changes
+        vehicleNumber: ''
       });
-      // Fetch vehicles for the selected PO
       fetchVehiclesForPO(selectedPO.poNumber);
     } else {
       setUnloadingForm({
@@ -175,15 +222,34 @@ const UnloadingDashboard = () => {
   };
 
   return (
-    <Container maxWidth="xl">
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-        <Typography variant="h4" component="h1">
+    <Container maxWidth="xl" sx={{ py: 3 }}>
+      {/* Header */}
+      <Box
+        sx={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          mb: 4,
+          p: 2,
+          borderRadius: 3,
+          background: "linear-gradient(135deg, #1976d2 30%, #42a5f5 90%)",
+          color: "white",
+          boxShadow: "0 4px 20px rgba(0,0,0,0.15)"
+        }}
+      >
+        <Typography variant="h5" sx={{ fontWeight: 700 }}>
           Unloading Department Dashboard
         </Typography>
         <Button
-          variant="outlined"
+          variant="contained"
           startIcon={<Logout />}
           onClick={handleLogout}
+          sx={{
+            background: "rgba(255,255,255,0.2)",
+            color: "white",
+            "&:hover": { background: "rgba(255,255,255,0.3)" },
+            textTransform: "none"
+          }}
         >
           Logout
         </Button>
@@ -192,13 +258,24 @@ const UnloadingDashboard = () => {
       {/* Stats Card */}
       <Grid container spacing={3} sx={{ mb: 4 }}>
         <Grid item xs={12} sm={6} md={3}>
-          <Card>
+          <Card
+            sx={{
+              borderRadius: 3,
+              boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
+              transition: "0.3s",
+              "&:hover": { boxShadow: "0 6px 18px rgba(0,0,0,0.2)" }
+            }}
+          >
             <CardContent>
-              <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                <Unarchive sx={{ fontSize: 40, color: 'primary.main', mr: 2 }} />
+              <Box sx={{ display: "flex", alignItems: "center" }}>
+                <Unarchive sx={{ fontSize: 40, color: "primary.main", mr: 2 }} />
                 <Box>
-                  <Typography variant="h4">{unloadingRecords.length}</Typography>
-                  <Typography variant="body2" color="text.secondary">Unloading Records</Typography>
+                  <Typography variant="h4" sx={{ fontWeight: 700 }}>
+                    {unloadingRecords.length}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Unloading Records
+                  </Typography>
                 </Box>
               </Box>
             </CardContent>
@@ -206,36 +283,52 @@ const UnloadingDashboard = () => {
         </Grid>
       </Grid>
 
-      {/* Unloading Records */}
-      <Paper sx={{ p: 3 }}>
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-          <Typography variant="h6">Unloading Records</Typography>
+      {/* Unloading Records Table */}
+      <Paper
+        sx={{
+          p: 3,
+          borderRadius: 3,
+          boxShadow: "0 4px 20px rgba(0,0,0,0.1)"
+        }}
+      >
+        <Box
+          sx={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            mb: 2
+          }}
+        >
+          <Typography variant="h6" sx={{ fontWeight: 600 }}>
+            Unloading Records
+          </Typography>
           <Button
             variant="contained"
             startIcon={<Add />}
             onClick={openCreateDialog}
+            sx={{ textTransform: "none", borderRadius: 2 }}
           >
             Record Unloading
           </Button>
         </Box>
-        
+
         <TableContainer>
-          <Table>
-            <TableHead>
+          <Table sx={{ minWidth: 650 }}>
+            <TableHead sx={{ background: "#f5f7fa" }}>
               <TableRow>
-                <TableCell>Vehicle Number</TableCell>
-                <TableCell>PO Number</TableCell>
-                <TableCell>Material</TableCell>
-                <TableCell>Storage Location</TableCell>
-                <TableCell>Quantity Unloaded</TableCell>
-                <TableCell>Start Time</TableCell>
-                <TableCell>End Time</TableCell>
-                <TableCell>Actions</TableCell>
+                <TableCell sx={{ fontWeight: 600 }}>Vehicle Number</TableCell>
+                <TableCell sx={{ fontWeight: 600 }}>PO Number</TableCell>
+                <TableCell sx={{ fontWeight: 600 }}>Material</TableCell>
+                <TableCell sx={{ fontWeight: 600 }}>Storage Location</TableCell>
+                <TableCell sx={{ fontWeight: 600 }}>Quantity Unloaded</TableCell>
+                <TableCell sx={{ fontWeight: 600 }}>Start Time</TableCell>
+                <TableCell sx={{ fontWeight: 600 }}>End Time</TableCell>
+                <TableCell sx={{ fontWeight: 600 }}>Actions</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
               {unloadingRecords.map((record) => (
-                <TableRow key={record.id}>
+                <TableRow key={record.id} sx={{ "&:hover": { background: "#f1f3f6" } }}>
                   <TableCell>{record.vehicleNumber}</TableCell>
                   <TableCell>{record.poNumber}</TableCell>
                   <TableCell>{record.material}</TableCell>
@@ -244,13 +337,22 @@ const UnloadingDashboard = () => {
                   <TableCell>{new Date(record.unloadingStartTime).toLocaleString()}</TableCell>
                   <TableCell>{new Date(record.unloadingEndTime).toLocaleString()}</TableCell>
                   <TableCell>
-                    <Button
-                      size="small"
-                      startIcon={<Visibility />}
-                      onClick={() => {/* View unloading details */}}
-                    >
-                      View
-                    </Button>
+<Button
+  size="small"
+  startIcon={<Visibility />}
+  sx={{ textTransform: "none" }}
+  onClick={() => handleViewRecord(record)}
+>
+  View
+</Button>
+  <Button
+    size="small"
+    variant="outlined"
+    sx={{ textTransform: "none" }}
+    onClick={() => handleEditRecord(record)}
+  >
+    Edit
+  </Button>
                   </TableCell>
                 </TableRow>
               ))}
@@ -259,8 +361,135 @@ const UnloadingDashboard = () => {
         </TableContainer>
       </Paper>
 
+      <Dialog
+  open={openEditDialog}
+  onClose={() => setOpenEditDialog(false)}
+  maxWidth="md"
+  fullWidth
+>
+  <DialogTitle>Edit Unloading Record</DialogTitle>
+  <DialogContent>
+    <Grid container spacing={2} sx={{ mt: 1 }}>
+      {/* Reuse the same TextFields as in create dialog */}
+      <Grid item xs={12} sm={6}>
+        <TextField
+          fullWidth
+          label="Vehicle Number"
+          value={unloadingForm.vehicleNumber}
+          onChange={(e) => setUnloadingForm({ ...unloadingForm, vehicleNumber: e.target.value })}
+          margin="normal"
+          required
+        />
+      </Grid>
+      <Grid item xs={12} sm={6}>
+        <POSelector
+          value={unloadingForm.poNumber ? { poNumber: unloadingForm.poNumber } : null}
+          onChange={handlePOSelection}
+          label="PO Number"
+          required
+          showDetails={true}
+          placeholder="Search PO number..."
+        />
+      </Grid>
+      <Grid item xs={12} sm={6}>
+        <TextField
+          fullWidth
+          label="Material"
+          value={unloadingForm.material}
+          onChange={(e) => setUnloadingForm({ ...unloadingForm, material: e.target.value })}
+          margin="normal"
+          required
+        />
+      </Grid>
+      <Grid item xs={12} sm={6}>
+        <TextField
+          fullWidth
+          label="Supplier Name"
+          value={unloadingForm.supplierName}
+          onChange={(e) => setUnloadingForm({ ...unloadingForm, supplierName: e.target.value })}
+          margin="normal"
+          required
+        />
+      </Grid>
+      <Grid item xs={12} sm={6}>
+        <TextField
+          fullWidth
+          select
+          label="Storage Location"
+          value={unloadingForm.storageLocation}
+          onChange={(e) => setUnloadingForm({ ...unloadingForm, storageLocation: e.target.value })}
+          margin="normal"
+          required
+        >
+          {Array.from({ length: 10 }, (_, i) => (
+            <MenuItem key={i+1} value={`L${i+1}`}>{`L${i+1}`}</MenuItem>
+          ))}
+        </TextField>
+      </Grid>
+      <Grid item xs={12} sm={6}>
+        <TextField
+          fullWidth
+          label="Quantity Unloaded"
+          type="number"
+          value={unloadingForm.quantityUnloaded}
+          onChange={(e) => setUnloadingForm({ ...unloadingForm, quantityUnloaded: e.target.value })}
+          margin="normal"
+          required
+        />
+      </Grid>
+      <Grid item xs={12} sm={6}>
+        <TextField
+          fullWidth
+          label="Unloading Start Time"
+          type="datetime-local"
+          value={unloadingForm.unloadingStartTime}
+          onChange={(e) => setUnloadingForm({ ...unloadingForm, unloadingStartTime: e.target.value })}
+          margin="normal"
+          InputLabelProps={{ shrink: true }}
+          required
+        />
+      </Grid>
+      <Grid item xs={12} sm={6}>
+        <TextField
+          fullWidth
+          label="Unloading End Time"
+          type="datetime-local"
+          value={unloadingForm.unloadingEndTime}
+          onChange={(e) => setUnloadingForm({ ...unloadingForm, unloadingEndTime: e.target.value })}
+          margin="normal"
+          InputLabelProps={{ shrink: true }}
+          required
+        />
+      </Grid>
+      <Grid item xs={12}>
+        <TextField
+          fullWidth
+          label="Remarks"
+          value={unloadingForm.remarks}
+          onChange={(e) => setUnloadingForm({ ...unloadingForm, remarks: e.target.value })}
+          margin="normal"
+          multiline
+          rows={3}
+        />
+      </Grid>
+    </Grid>
+  </DialogContent>
+  <DialogActions>
+    <Button onClick={() => setOpenEditDialog(false)}>Cancel</Button>
+    <Button onClick={handleUpdateUnloadingRecord} variant="contained">
+      Update Record
+    </Button>
+  </DialogActions>
+</Dialog>
+
+
       {/* Create Unloading Record Dialog */}
-      <Dialog open={openUnloadingDialog} onClose={() => setOpenUnloadingDialog(false)} maxWidth="md" fullWidth>
+      <Dialog
+        open={openUnloadingDialog}
+        onClose={() => setOpenUnloadingDialog(false)}
+        maxWidth="md"
+        fullWidth
+      >
         <DialogTitle>Record Unloading</DialogTitle>
         <DialogContent>
           <Grid container spacing={2} sx={{ mt: 1 }}>
@@ -337,16 +566,9 @@ const UnloadingDashboard = () => {
                 margin="normal"
                 required
               >
-                <MenuItem value="L1">L1</MenuItem>
-                <MenuItem value="L2">L2</MenuItem>
-                <MenuItem value="L3">L3</MenuItem>
-                <MenuItem value="L4">L4</MenuItem>
-                <MenuItem value="L5">L5</MenuItem>
-                <MenuItem value="L6">L6</MenuItem>
-                <MenuItem value="L7">L7</MenuItem>
-                <MenuItem value="L8">L8</MenuItem>
-                <MenuItem value="L9">L9</MenuItem>
-                <MenuItem value="L10">L10</MenuItem>
+                {Array.from({ length: 10 }, (_, i) => (
+                  <MenuItem key={i+1} value={`L${i+1}`}>{`L${i+1}`}</MenuItem>
+                ))}
               </TextField>
             </Grid>
             <Grid item xs={12} sm={6}>
@@ -404,6 +626,106 @@ const UnloadingDashboard = () => {
           </Button>
         </DialogActions>
       </Dialog>
+      <Dialog
+  open={openViewDialog}
+  onClose={() => setOpenViewDialog(false)}
+  maxWidth="md"
+  fullWidth
+>
+  <DialogTitle>Unloading Record Details</DialogTitle>
+  <DialogContent>
+    {selectedRecord && (
+      <Grid container spacing={2} sx={{ mt: 1 }}>
+        <Grid item xs={12} sm={6}>
+          <TextField
+            fullWidth
+            label="Vehicle Number"
+            value={selectedRecord.vehicleNumber}
+            margin="normal"
+            InputProps={{ readOnly: true }}
+          />
+        </Grid>
+        <Grid item xs={12} sm={6}>
+          <TextField
+            fullWidth
+            label="PO Number"
+            value={selectedRecord.poNumber}
+            margin="normal"
+            InputProps={{ readOnly: true }}
+          />
+        </Grid>
+        <Grid item xs={12} sm={6}>
+          <TextField
+            fullWidth
+            label="Material"
+            value={selectedRecord.material}
+            margin="normal"
+            InputProps={{ readOnly: true }}
+          />
+        </Grid>
+        <Grid item xs={12} sm={6}>
+          <TextField
+            fullWidth
+            label="Supplier Name"
+            value={selectedRecord.supplierName}
+            margin="normal"
+            InputProps={{ readOnly: true }}
+          />
+        </Grid>
+        <Grid item xs={12} sm={6}>
+          <TextField
+            fullWidth
+            label="Storage Location"
+            value={selectedRecord.storageLocation}
+            margin="normal"
+            InputProps={{ readOnly: true }}
+          />
+        </Grid>
+        <Grid item xs={12} sm={6}>
+          <TextField
+            fullWidth
+            label="Quantity Unloaded"
+            value={selectedRecord.quantityUnloaded}
+            margin="normal"
+            InputProps={{ readOnly: true }}
+          />
+        </Grid>
+        <Grid item xs={12} sm={6}>
+          <TextField
+            fullWidth
+            label="Start Time"
+            value={new Date(selectedRecord.unloadingStartTime).toLocaleString()}
+            margin="normal"
+            InputProps={{ readOnly: true }}
+          />
+        </Grid>
+        <Grid item xs={12} sm={6}>
+          <TextField
+            fullWidth
+            label="End Time"
+            value={new Date(selectedRecord.unloadingEndTime).toLocaleString()}
+            margin="normal"
+            InputProps={{ readOnly: true }}
+          />
+        </Grid>
+        <Grid item xs={12}>
+          <TextField
+            fullWidth
+            label="Remarks"
+            value={selectedRecord.remarks}
+            margin="normal"
+            multiline
+            rows={3}
+            InputProps={{ readOnly: true }}
+          />
+        </Grid>
+      </Grid>
+    )}
+  </DialogContent>
+  <DialogActions>
+    <Button onClick={() => setOpenViewDialog(false)}>Close</Button>
+  </DialogActions>
+</Dialog>
     </Container>
   );
 };
